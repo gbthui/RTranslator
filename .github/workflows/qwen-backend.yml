@@ -1,36 +1,107 @@
 name: Qwen backend validation
 on:
-  push:
-    branches: [feat/qwen-asr-cancellation]
   pull_request:
     branches: [v3.00]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: qwen-backend-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  source-provenance:
+  core:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Archive exact application and runtime sources
-        run: |
-          mkdir -p provenance
-          git archive --format=tar HEAD > provenance/rtranslator-source.tar
-          git init runtime-source
-          git -C runtime-source remote add origin https://github.com/k2-fsa/sherpa-onnx.git
-          git -C runtime-source fetch --depth=1 origin 13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
-          git -C runtime-source archive --format=tar FETCH_HEAD > provenance/sherpa-source.tar
-          git init gguf-source
-          git -C gguf-source remote add origin https://github.com/handy-computer/transcribe.cpp.git
-          git -C gguf-source fetch --depth=1 origin 63a44d9239d610b3908e8a66b384924cd4a77217
-          git -C gguf-source archive --format=tar FETCH_HEAD > provenance/transcribe-source.tar
-          sha256sum provenance/*.tar > provenance/SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/setup-java@v4
         with:
-          name: qwen-source-provenance
-          path: provenance/
-          retention-days: 3
+          distribution: temurin
+          java-version: '17'
+      - name: Java cancellation and lifecycle regressions
+        run: bash tools/test-qwen-core.sh
+      - name: Build-script syntax and patch hygiene
+        run: |
+          python3 -m py_compile tools/prepare-qwen-runtimes.py tools/patch-qwen-sherpa.py tools/download-qwen-test-models.py
+          git diff --check
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install SDK and native dependencies
+        run: |
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+          sudo apt-get update
+          sudo apt-get install -y ninja-build glslc libvulkan-dev spirv-headers
+      - uses: actions/cache@v4
+        with:
+          path: .gradle/qwen-runtimes
+          key: qwen-arm64-ndk28c-${{ hashFiles('tools/prepare-qwen-runtimes.py', 'tools/patch-qwen-sherpa.py', 'app/src/main/cpp/qwen/**') }}
+      - name: Build isolated ONNX, GGUF CPU and GGUF Vulkan libraries
+        run: python3 tools/prepare-qwen-runtimes.py --ndk "$ANDROID_HOME/ndk/28.2.13676358"
+      - name: Compile and package Android debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+      - name: Verify APK contains all runtime libraries
+        run: |
+          python3 - <<'PY'
+          import glob, zipfile
+          apk = glob.glob('app/build/outputs/apk/debug/*.apk')[0]
+          with zipfile.ZipFile(apk) as z:
+              for name in ('onnx', 'gguf_cpu', 'gguf_vulkan'):
+                  assert 'lib/arm64-v8a/librtranslator_qwen_' + name + '.so' in z.namelist(), name
+              assert 'lib/arm64-v8a/libonnxruntime.so' in z.namelist()
+              assert 'assets/qwen-runtime.properties' in z.namelist()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwen-android-build
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            .gradle/qwen-runtimes/runtime.json
+          retention-days: 7
+  native-cpu-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: .gradle/qwen-host
+          key: qwen-linux-${{ hashFiles('tools/prepare-qwen-runtimes.py', 'tools/patch-qwen-sherpa.py', 'app/src/main/cpp/qwen/**') }}
+      - name: Build the production JNI sources for host CPU
+        run: python3 tools/prepare-qwen-runtimes.py --host --output .gradle/qwen-host
+      - name: Fetch verified test weights and fixtures
+        run: python3 tools/download-qwen-test-models.py .gradle/qwen-smoke-models
+      - name: Transcribe, cancel and reuse both real backends
+        run: |
+          set -o pipefail
+          bash tools/test-qwen-native.sh gguf .gradle/qwen-smoke-models/Qwen3-ASR-0.6B-Q4_K_M.gguf .gradle/qwen-smoke-models/jfk.wav .gradle/qwen-smoke-models/zh.wav | tee gguf-smoke.log
+          bash tools/test-qwen-native.sh onnx .gradle/qwen-smoke-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 .gradle/qwen-smoke-models/jfk.wav .gradle/qwen-smoke-models/zh.wav | tee onnx-smoke.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwen-native-evidence
+          path: |
+            .gradle/qwen-host/runtime.json
+            .gradle/qwen-smoke-models/provenance.json
+            *-smoke.log
+          retention-days: 7
