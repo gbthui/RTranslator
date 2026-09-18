@@ -1,0 +1,50 @@
+name: Apply model-library UX changes
+on:
+  push:
+    branches: [feat/qwen-asr-cancellation]
+    paths: [.github/workflows/qwen-ux-apply.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'gbthui/RTranslator'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/qwen-asr-cancellation
+      - name: Apply verified edits to their exact source versions
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, pathlib
+          stage = pathlib.Path('tools/.ux-stage')
+          data = lzma.decompress(base64.b64decode(''.join((stage / ('part%d.b64' % i)).read_text().strip() for i in range(4)), validate=True))
+          assert hashlib.sha256(data).hexdigest() == 'bb7cf1bdec9d8cc3b6afda19d8dc21d986e27fbf6c9c1c7ee82bc2980cd1f95e'
+          prepared = []
+          for item in json.loads(data):
+              path = pathlib.Path(item['path'])
+              assert not path.is_absolute() and '..' not in path.parts and path.parts[0] in ('app', 'docs', 'tools')
+              old = path.read_bytes() if path.exists() else b''
+              assert hashlib.sha256(old).hexdigest() == item['base'], str(path)
+              lines = old.decode().splitlines(True)
+              for start, end, text in reversed(item['edits']):
+                  lines[start:end] = [text]
+              new = ''.join(lines).encode()
+              assert hashlib.sha256(new).hexdigest() == item['target'], str(path)
+              prepared.append((path, new))
+          for path, new in prepared:
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(new)
+          print('Applied', len(prepared), 'hash-verified files')
+          PY
+          git rm -r tools/.ux-stage
+          bash tools/test-qwen-core.sh
+          bash tools/test-model-library.sh
+          git add app docs tools
+          git diff --cached --check
+      - name: Commit only application changes on the existing feature branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: make model setup optional and fix long-recording window lifecycle'
+          git push origin HEAD:feat/qwen-asr-cancellation
