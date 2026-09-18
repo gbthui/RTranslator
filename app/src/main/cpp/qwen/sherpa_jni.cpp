@@ -62,7 +62,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL METHOD(decode)(JNIEnv *env, jobject, j
         rtranslator_qwen::CheckCancelled();
         model->recognizer->DecodeStream(stream.get());
         rtranslator_qwen::CheckCancelled();
-        auto result = model->recognizer->GetResult(stream.get());
+        const auto &result = stream->GetResult();
         return rq::Result(env, result.text, hint.empty() ? stream->GetOption("rtranslator_language") : hint);
     } catch (const std::length_error &) {
         if (signal && signal->cancelled.load()) rq::Fail(env, "java/util/concurrent/CancellationException", "Speech recognition cancelled");
