@@ -109,9 +109,9 @@ public abstract class VoiceTranslationService extends GeneralService {
     protected final Object mLock = new Object();
     protected boolean isMicActivated = true;
     protected boolean isMicAutomatic = true;
-    protected boolean manualRecognizingFirstLanguage = false;
-    protected boolean manualRecognizingSecondLanguage = false;
-    protected boolean manualRecognizingAutoLanguage = false;
+    protected volatile boolean manualRecognizingFirstLanguage = false;
+    protected volatile boolean manualRecognizingSecondLanguage = false;
+    protected volatile boolean manualRecognizingAutoLanguage = false;
 
 
     @Override
@@ -134,7 +134,7 @@ public abstract class VoiceTranslationService extends GeneralService {
             void onUtteranceStarting(GuiMessage message, boolean first) {
                 //if (ttsEngine != null && shouldDeactivateMicDuringTTS() && ttsEngine.isEmpty() && !ttsEngine.isPaused()) {
                 notifyTTSStarted(String.valueOf(message.getMessageID()));
-                if(first) {
+                if (first && shouldDeactivateMicDuringTTS()) {
                     if (isMicAutomatic) stopVoiceRecorder();
                     notifyMicDeactivated();   // we notify the client
                 }
@@ -179,10 +179,10 @@ public abstract class VoiceTranslationService extends GeneralService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if(intent == null){  //this means that the process has been restarted automatically by Android
+        if (intent == null || !((Global) getApplication()).models().ready(true)) {
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf(startId);
-            return super.onStartCommand(null, flags, startId);
+            return START_NOT_STICKY;
         }
         if (notification == null) {
             notification = intent.getParcelableExtra("notification");
@@ -384,6 +384,7 @@ public abstract class VoiceTranslationService extends GeneralService {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
+        if (clientHandler == null || !((Global) getApplication()).models().ready(true)) return null;
         return new Messenger(clientHandler).getBinder();
     }
 

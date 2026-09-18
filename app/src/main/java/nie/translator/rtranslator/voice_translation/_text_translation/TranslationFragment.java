@@ -70,6 +70,11 @@ public class TranslationFragment extends Fragment {
 
     //TranslatorFragment's GUI
     private MaterialButton translateButton;
+    private Translator subscribedTranslator;
+    private boolean loadingModel;
+    private boolean viewStarted;
+    private TextView modelStatus;
+    private final Runnable readinessObserver = this::refreshModelReadiness;
     private FloatingActionButton walkieTalkieButton;
     private FloatingActionButton conversationButton;
     private FloatingActionButton walkieTalkieButtonSmall;
@@ -156,6 +161,8 @@ public class TranslationFragment extends Fragment {
         secondLanguageSelector = view.findViewById(R.id.okButtonCard);
         invertLanguagesButton = view.findViewById(R.id.invertLanguages);
         translateButton = view.findViewById(R.id.buttonTranslate);
+        modelStatus = view.findViewById(R.id.modelStatus);
+        modelStatus.setOnClickListener(v -> ((VoiceTranslationActivity) requireActivity()).openModelManager());
         walkieTalkieButton = view.findViewById(R.id.buttonMicLeft);
         conversationButton = view.findViewById(R.id.buttonMicRight);
         walkieTalkieButtonSmall = view.findViewById(R.id.buttonWalkieTalkieSmall);
@@ -272,25 +279,23 @@ public class TranslationFragment extends Fragment {
                 activateTranslationButton();
             }
         };
-        translateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                String text = inputText.getText().toString();
-
-                if(text.length() <= 0){   //test code  todo: remove before release
-                    text = "Also unlike 2014, there aren’t nearly as many loopholes. You can’t just buy a 150-watt incandescent or a three-way bulb — the ban covers any normal bulb that generates less than 45 lumens per watt, which pretty much rules out both incandescent and halogen tech in their entirety.";
-                    inputText.setText(text);
-                }
-
-                if(!text.isEmpty()) {
-                    CustomLocale firstLanguage = global.getFirstTextLanguage(true);
-                    CustomLocale secondLanguage = global.getSecondTextLanguage(true);
-                    //we deactivate translate button
-                    deactivateTranslationButton();  //todo: implement stop button instead of deactivation
-                    //we start the translation
-                    global.getTranslator().translate(text, firstLanguage, secondLanguage, global.getBeamSize(), true, Global.RTranslatorMode.TEXT_TRANSLATION_MODE);
-                }
+        translateButton.setOnClickListener(view -> {
+            final String text = inputText.getText().toString();
+            if (text.trim().isEmpty() || loadingModel) return;
+            if (!nie.translator.rtranslator.models.FeatureReadiness.missing(global, false).isEmpty()) {
+                refreshModelReadiness(); return;
             }
+            loadingModel = true;
+            deactivateTranslationButton();
+            activity.prepareFeature(false, () -> {
+                if (!viewStarted || getView() == null) return;
+                loadingModel = false;
+                attachTranslator();
+                Translator translator = global.getTranslator();
+                if (translator == null) { refreshModelReadiness(); return; }
+                translator.translate(text, global.getFirstTextLanguage(true), global.getSecondTextLanguage(true),
+                    global.getBeamSize(), true, Global.RTranslatorMode.TEXT_TRANSLATION_MODE);
+            });
         });
         settingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -349,15 +354,19 @@ public class TranslationFragment extends Fragment {
             public void onClick(View v) {
                 inputText.setText("");
                 outputText.setText("");
-                global.getTranslator().resetLastOutput();
+                if (global.getTranslator() != null) global.getTranslator().resetLastOutput();
             }
         });
     }
 
     public void onStart() {
         super.onStart();
-        GuiMessage lastInputText = global.getTranslator().getLastInputText();
-        GuiMessage lastOutputText = global.getTranslator().getLastOutputText();
+        viewStarted = true;
+        global.models().addObserver(readinessObserver);
+        loadingModel = false;
+        Translator currentTranslator = global.models().ready(false) ? global.getTranslator() : null;
+        GuiMessage lastInputText = currentTranslator == null ? null : currentTranslator.getLastInputText();
+        GuiMessage lastOutputText = currentTranslator == null ? null : currentTranslator.getLastOutputText();
 
         //we hide the keyboard
         if(getView() != null) {
@@ -497,7 +506,7 @@ public class TranslationFragment extends Fragment {
             outputText.setText(lastOutputText.getMessage().getText());
         }
         //we attach the translate listener
-        global.getTranslator().addCallback(translateListener);
+        attachTranslator();
         //we attach the click listener for the language selectors
         firstLanguageSelector.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -524,7 +533,7 @@ public class TranslationFragment extends Fragment {
             }
         });
         //we restore the translation button state based on the translation status
-        if(global.getTranslator().isTranslating()){
+        if(global.getTranslator() != null && global.getTranslator().isTranslating()){
             deactivateTranslationButton();
         }else{
             activateTranslationButton();
@@ -616,6 +625,7 @@ public class TranslationFragment extends Fragment {
             }
         };
         initializeTTS();
+        refreshModelReadiness();
 
         ttsInputButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -761,6 +771,8 @@ public class TranslationFragment extends Fragment {
     }
 
     private void activateTranslationButton(){
+        if (!viewStarted) return;
+        translateButton.setEnabled(!loadingModel && nie.translator.rtranslator.models.FeatureReadiness.missing(global, false).isEmpty());
         if(colorAnimator != null){
             colorAnimator.cancel();
         }
@@ -792,6 +804,7 @@ public class TranslationFragment extends Fragment {
     }
 
     private void deactivateTranslationButton(){
+        translateButton.setEnabled(false);
         if(colorAnimator != null){
             colorAnimator.cancel();
         }
@@ -905,8 +918,41 @@ public class TranslationFragment extends Fragment {
         outputText.removeTextChangedListener(outputTextListener);
         inputText.clearFocus();
         outputText.clearFocus();
-        //we detach the translate listener
-        global.getTranslator().removeCallback(translateListener);
+        // Remove the exact instance subscribed, even when settings replaced the global model.
+        viewStarted = false;
+        global.models().removeObserver(readinessObserver);
+        if (subscribedTranslator != null) subscribedTranslator.removeCallback(translateListener);
+        subscribedTranslator = null;
+    }
+
+    private void attachTranslator() {
+        Translator next = global.models().ready(false) ? global.getTranslator() : null;
+        if (subscribedTranslator == next) return;
+        if (subscribedTranslator != null) subscribedTranslator.removeCallback(translateListener);
+        subscribedTranslator = next;
+        if (next != null) next.addCallback(translateListener);
+    }
+
+    public void refreshModelReadiness() {
+        if (getView() == null || global == null) return;
+        loadingModel = global.models().isLoading();
+        String missing = nie.translator.rtranslator.models.FeatureReadiness.missing(global, false);
+        String status = !missing.isEmpty() ? getString(R.string.model_setup_message, missing)
+            : global.models().isClosing() ? getString(R.string.model_closing)
+            : loadingModel ? getString(R.string.model_loading) : "";
+        modelStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+        modelStatus.setText(status);
+        boolean available = missing.isEmpty() && !global.models().isClosing() && !loadingModel;
+        translateButton.setEnabled(available && (global.getTranslator() == null || !global.getTranslator().isTranslating()));
+        if (translateButton.isEnabled()) activateTranslationButton(); else deactivateTranslationButton();
+        firstLanguageSelector.setEnabled(available);
+        secondLanguageSelector.setEnabled(available);
+        invertLanguagesButton.setEnabled(available);
+        boolean voice = nie.translator.rtranslator.models.FeatureReadiness.missing(global, true).isEmpty();
+        walkieTalkieButtonSmall.setAlpha(voice ? 1f : .45f);
+        conversationButtonSmall.setAlpha(voice ? 1f : .45f);
+        setDisplayedFirstLanguage(global.getFirstTextLanguage(false));
+        setDisplayedSecondLanguage(global.getSecondTextLanguage(false));
     }
 
     private void setFirstLanguage(CustomLocale language) {

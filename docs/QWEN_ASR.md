@@ -60,3 +60,82 @@ bash tools/test-qwen-native.sh onnx .gradle/qwen-smoke-models/sherpa-onnx-qwen3-
 ```
 
 CI separates Java lifecycle tests, Android APK compilation and real-model host smoke tests. Check each job's actual result. None measures phone power use, peak Android memory, Vulkan/NNAPI speed or field accuracy. Test those on the target phone with the selected translation model loaded before relying on the app for travel.
+
+## Optional model library and first launch
+
+The launcher now opens the application shell without downloading weights or loading
+inference sessions. Settings remain available with an empty, incomplete, or invalid
+model library. Model installation lives in the existing **Settings → Manage models**
+page, using its RadioGroupPlus, ResourceManagerView, Material switches and dialogs.
+The former standalone Qwen settings activity only redirects there for compatibility.
+
+Select a translation model and a speech model independently. Saving an unavailable
+selection is allowed: the feature entry explains the missing dependency rather than
+redirecting to onboarding. Text translation needs the selected translation package;
+voice modes additionally need the selected ASR package and Mozilla resources when
+the existing Mozilla-for-voice option is enabled. Optional Tatoeba and dictionary
+packages do not block primary translation. Availability is checked from files, with
+runtime loading/validation deferred until use; a filename alone does not prove a
+valid model. Runtime failures return to an accessible settings entry.
+
+Use **Import translation model**, **Import speech model**, or **Import optional
+resources** for extracted folders; a transcribe.cpp-compatible single-file GGUF is
+selected as a document. Imports copy into private staging and do not alter the source
+folder. ONNX sessions are checked before publishing legacy ONNX packages; Qwen keeps
+its native validation and atomic installed-package marker. Existing legacy packages
+must be explicitly deleted in model management before replacement. Downloads start
+only when requested. Qwen downloads are resumable, bounded and SHA-256-verified;
+unpacking rejects path traversal and links. Leaving the model page does not implicitly
+resume paused downloads. Active Qwen work can be cancelled on leaving; completed
+packages remain installed.
+
+Model changes close voice services, cancel pending ASR and retire native sessions
+before files can be replaced or deleted. UI remains responsive while native work
+returns. This does not remove the documented GGUF encoder cancellation latency.
+
+## Long recording windows and microphone state
+
+The recorder has a roughly 29-second bounded audio window. Previously it handled
+that limit through the same callback as a genuine end of speech. In walkie-talkie
+mode this could resume TTS, deactivate the microphone, and clear the manual language
+flags after the first recognition result. Later windows could therefore be skipped
+or interrupted by playback.
+
+A rollover now emits a non-terminal audio segment, preserves the recording state and
+pre-roll boundary, and does not resume TTS. Manual routing is latched per recording,
+not inferred from a recognition result that may arrive much later. Only a genuine
+silence endpoint or the user's stop releases the TTS pause. Releasing the recording
+button still flushes the final segment; it does not cancel recognition. The headset
+TTS-start microphone gate now matches the existing TTS-end gate.
+
+A gray microphone during actual speaker playback can still be intentional to avoid
+recording the translated voice. It must not be described as merely cosmetic: a
+stopped recorder cannot capture new speech. Native throughput and the bounded ASR
+queue remain real limits; this change is not an unlimited continuous-dictation mode.
+
+## CapsWriter comparison and decision
+
+Reference inspected: `gbthui/CapsWriter-Offline` at
+`7a975c3536e860c27f570eb279e3406f0034b3b8`, particularly
+`core/server/engines/qwen_asr_gguf/inference/asr.py` and `encoder.py`.
+That implementation combines previous audio embeddings and stable text in a bounded
+history window, uses token rollback, and exposes prefix-prefill reuse. Its encoder
+also contains a Windows DirectML-specific static-padding/mask path. This is a
+hybrid ONNX encoder plus llama.cpp decoder, not the transcribe.cpp single-file
+runtime used here.
+
+Those changes are not ported as an unmeasured phone optimization. Carrying previous
+turns into a two-person translator can mix speakers/languages, and larger history
+increases prefill and memory. Changing attention masks is not equivalent to fixing
+capture windows. This revision preserves the pretrained runtime's attention behavior
+and the existing Qwen chunk bound, and fixes the application-level window lifecycle.
+A future history/prefix-cache change needs matching multi-turn accuracy, memory,
+latency and cancellation measurements before enabling it.
+
+## Regression scope for this revision
+
+`bash tools/test-model-library.sh` adds 21 filesystem/capture-policy checks plus
+static launch/UI-integration contracts. `bash tools/test-qwen-core.sh` retains the
+13 cancellation/lifecycle tests. These are host tests, not Android touch, rotation,
+accessibility, microphone, NNAPI/Vulkan or model-quality tests. The Android APK must
+also be compiled; real-device interaction and UI appearance still require validation.

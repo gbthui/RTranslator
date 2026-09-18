@@ -138,23 +138,38 @@ public final class QwenModelStore {
                         out.getFD().sync();
                     }
                 }
-                token.check(); validate(staged, engine);
-                // The CPU loader also validates architecture, tensors and tokenizer.
-                try (QwenBackend ignored = open(staged, engine, false)) { token.check(); }
-                AtomicFile marker = new AtomicFile(new File(root, "current"));
-                FileOutputStream output = null;
-                try {
-                    output = marker.startWrite();
-                    output.write(staged.getName().getBytes(StandardCharsets.UTF_8));
-                    token.check(); marker.finishWrite(output); output = null;
-                    published = true;
-                } finally { if (output != null) marker.failWrite(output); }
+                publish(root, staged, engine, token);
+                published = true;
                 // Keep previous generations: another activity may still hold a mapped model.
                 // Removal is an explicit settings operation after all ASR has closed.
                 return staged;
             } finally { if (!published) deleteTree(staged); }
         }
     }
+    /** Takes ownership of a prepared private directory, never of user-selected files. */
+    public static File installPrepared(Context context, File source, String engine, CancellationToken token) throws IOException {
+        synchronized (IMPORT_LOCK) {
+            File root = root(context, engine);
+            if (!root.mkdirs() && !root.isDirectory()) throw new IOException("Cannot create model directory");
+            File staged = new File(root, "model-" + UUID.randomUUID());
+            if (!source.renameTo(staged)) throw new IOException("Cannot stage downloaded model");
+            boolean published = false;
+            try { publish(root, staged, engine, token); published = true; return staged; }
+            finally { if (!published) deleteTree(staged); }
+        }
+    }
+    private static void publish(File root, File staged, String engine, CancellationToken token) throws IOException {
+        token.check(); validate(staged, engine);
+        try (QwenBackend ignored = open(staged, engine, false)) { token.check(); }
+        AtomicFile marker = new AtomicFile(new File(root, "current"));
+        FileOutputStream output = null;
+        try {
+            output = marker.startWrite();
+            output.write(staged.getName().getBytes(StandardCharsets.UTF_8));
+            token.check(); marker.finishWrite(output); output = null;
+        } finally { if (output != null) marker.failWrite(output); }
+    }
+
     private static boolean safeName(String name) {
         return name != null && !name.equals(".") && !name.equals("..") && !name.contains("/") && !name.contains("\\");
     }

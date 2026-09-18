@@ -577,4 +577,10 @@ public class LanguageResourcesManager {
     private boolean isMozillaEnabled(Global.RTranslatorMode rtranslatorMode){
         return useMozillaForTranslation || ((rtranslatorMode == Global.RTranslatorMode.WALKIE_TALKIE_MODE || rtranslatorMode == Global.RTranslatorMode.CONVERSATION_MODE) && useMozillaForVoiceTranslation);
     }
+    public void close() {
+        if (linguaLanguageDetector != null) linguaLanguageDetector.unloadLanguageModels();
+        tatoebaLinks.clear();
+        BergamotTranslator.cleanup();
+        DictionaryTranslator.cleanup();
+    }
 }

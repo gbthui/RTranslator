@@ -21,6 +21,14 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
             <TextView
+                android:id="@+id/modelLibraryStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                android:text="@string/model_library_intro"
+                android:textColor="@color/very_very_dark_gray"
+                android:accessibilityLiveRegion="polite" />
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -173,6 +181,15 @@
                     </androidx.constraintlayout.widget.ConstraintLayout>
                 </LinearLayout>
             </worker8.com.github.radiogroupplus.RadioGroupPlus>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/importTranslationModel"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:text="@string/model_import_translation" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -231,6 +248,99 @@
                 android:fontFamily="sans-serif-medium"
                 android:textColor="@color/accent"
                 android:layout_marginStart="16dp"/>
+            <worker8.com.github.radiogroupplus.RadioGroupPlus
+                android:id="@+id/speech_model_radios"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <LinearLayout android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:orientation="vertical">
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <RadioButton android:id="@+id/radioWhisper"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp" android:layout_marginTop="16dp"
+                            android:contentDescription="@string/qwen_whisper"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+                        <nie.translator.rtranslator.tools.gui.ResourceManagerView
+                            android:id="@+id/modelWhisper"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp" android:layout_marginEnd="16dp"
+                            app:layout_constraintStart_toEndOf="@id/radioWhisper"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:modelTitle="@string/qwen_whisper" app:modelDescription="@string/model_whisper_description" app:modelSize="290" />
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <RadioButton android:id="@+id/radioQwenOnnx"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp" android:layout_marginTop="16dp"
+                            android:contentDescription="@string/qwen_onnx"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+                        <nie.translator.rtranslator.tools.gui.ResourceManagerView
+                            android:id="@+id/modelQwenOnnx"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp" android:layout_marginEnd="16dp"
+                            app:layout_constraintStart_toEndOf="@id/radioQwenOnnx"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:modelTitle="@string/qwen_onnx" app:modelDescription="@string/model_qwen_onnx_description" app:modelSize="940" />
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <RadioButton android:id="@+id/radioQwenGguf"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp" android:layout_marginTop="16dp"
+                            android:contentDescription="@string/qwen_gguf"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+                        <nie.translator.rtranslator.tools.gui.ResourceManagerView
+                            android:id="@+id/modelQwenGguf"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp" android:layout_marginEnd="16dp"
+                            app:layout_constraintStart_toEndOf="@id/radioQwenGguf"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:modelTitle="@string/qwen_gguf" app:modelDescription="@string/model_qwen_gguf_description" app:modelSize="631" />
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                </LinearLayout>
+            </worker8.com.github.radiogroupplus.RadioGroupPlus>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/importSpeechModel"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:text="@string/model_import_speech" />
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchQwenAcceleration"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_margin="16dp" android:minHeight="48dp"
+                android:text="@string/qwen_hardware" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/retryQwenAcceleration"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:text="@string/model_retry_acceleration" />
+            <TextView android:id="@+id/modelOperationStatus"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginStart="16dp" android:layout_marginEnd="16dp"
+                android:accessibilityLiveRegion="polite" android:visibility="gone" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cancelModelOperation" style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="16dp" android:visibility="gone"
+                android:text="@string/qwen_cancel" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -315,45 +425,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="2"
-                    android:layout_marginStart="16dp">
-
-                    <TextView
-                        android:id="@+id/titleResource"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="24dp"
-                        android:layout_marginBottom="2dp"
-                        android:text="@string/translation_dictionaries"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/very_very_dark_gray"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintHorizontal_bias="0.0"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintVertical_bias="0.0" />
-
-                    <TextView
-                        android:id="@+id/descriptionResource"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_marginBottom="8dp"
-                        android:text="@string/description_dictionaries"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintHorizontal_bias="0.0"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@+id/titleResource"
-                        app:layout_constraintVertical_bias="0.0" />
-
-                </androidx.constraintlayout.widget.ConstraintLayout>
+                <nie.translator.rtranslator.tools.gui.ResourceManagerView
+                    android:id="@+id/resourceDictionaries"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" android:layout_weight="2"
+                    app:modelTitle="@string/translation_dictionaries"
+                    app:modelDescription="@string/description_dictionaries" app:modelSize="108" />
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchTranslationDict"
                     android:layout_width="wrap_content"
@@ -363,6 +440,17 @@
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="16dp"/>
             </LinearLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/importOptionalResource"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:text="@string/model_import_optional" />
+            <TextView android:id="@+id/qwenRamNote"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_margin="16dp" android:text="@string/model_ram_unknown" android:visibility="gone" />
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">

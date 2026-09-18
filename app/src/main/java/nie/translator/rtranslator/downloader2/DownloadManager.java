@@ -82,6 +82,12 @@ public class DownloadManager implements ServiceConnection {
         return false;
     }
 
+    public boolean subscribe(@Nullable Callback callback) {
+        this.callback = callback;
+        if (areDownloadsRunning(false)) { startAndBindService(); return true; }
+        return false;
+    }
+
     public void unsubscribe() {
         if(callback != null) {
             if (downloaderService != null) {
@@ -131,6 +137,9 @@ public class DownloadManager implements ServiceConnection {
                 DownloaderTools.deleteDownloadedFiles(savedDownloadStatus.get(index));
                 // we delete the download status from the preferences
                 DownloaderTools.deleteDownloadGroupInfoPreference(context, savedDownloadStatus.get(index));
+            } else {
+                // Existing/imported files may predate the split model-download catalogue.
+                DownloaderTools.deleteDownloadedFiles(downloadGroup);
             }
         }
         return false;

@@ -1,0 +1,34 @@
+<resources>
+    <string name="models_not_ready">模型尚未就绪</string>
+    <string name="manage_models">管理模型</string>
+    <string name="model_translation_missing">所选翻译模型尚未安装或文件不完整。</string>
+    <string name="model_voice_translation_missing">语音翻译所选的 Mozilla 语言模型尚未安装。</string>
+    <string name="model_speech_missing">所选语音识别模型尚未安装或文件不完整。</string>
+    <string name="model_download_in_progress">所需模型仍在下载，请完成下载后再使用对应功能。</string>
+    <string name="model_closing">正在释放使用中的模型。设置仍可使用，原生推理退出前暂不能更换文件。</string>
+    <string name="model_load_failed">所选模型加载失败。请在模型管理中检查文件；应用不会自动下载或替换模型。</string>
+    <string name="model_loading">正在加载所选模型…</string>
+    <string name="model_setup_message">%1$s\n\n点此进入模型管理，选择已有文件或手动下载模型。</string>
+    <string name="model_library_intro">在此选择模型后应用设置。可保存尚未安装的模型选择；资源齐全后对应功能才可使用。启动应用不会自动下载。</string>
+    <string name="model_whisper_description">Whisper Small。语音模型单独管理，不再与翻译模型和词典捆绑下载。</string>
+    <string name="model_qwen_onnx_description">Qwen3-ASR 0.6B INT8。导入包含 tokenizer 的 sherpa-onnx 模型目录，或下载经过校验的模型包。</string>
+    <string name="model_qwen_gguf_description">Qwen3-ASR 0.6B Q4_K_M。使用 transcribe.cpp 的单个 GGUF 文件，不适用于 llama.cpp 的 decoder/mmproj 双文件。</string>
+    <string name="model_import_translation">从文件夹导入所选翻译模型</string>
+    <string name="model_import_speech">从本地文件导入所选语音模型</string>
+    <string name="model_import_optional">导入可选资源</string>
+    <string name="model_ram_unknown">原有内存估算仅适用于 Whisper。Qwen 的占用取决于导入的权重和设备，暂不显示未经实测的内存估算。</string>
+    <string name="model_retry_acceleration">下次使用时重新尝试硬件加速</string>
+    <string name="model_retry_saved">已清除此模型的硬件加速失败记录。</string>
+    <string name="model_validating">正在导入并校验模型文件…</string>
+    <string name="model_downloading">正在下载模型文件…</string>
+    <string name="model_operation_complete">模型库已更新。选择所需模型后应用设置即可。</string>
+    <string name="model_delete_qwen_confirmation">删除此语音模型的所有已存版本？所选项会保留，但重新安装模型前语音功能不可用。</string>
+    <string name="model_download_confirmation">从模型发布方下载此模型？可能消耗约 1 GB 流量，并需额外空间用于校验。取消后保留已下载内容，重试时尝试续传。</string>
+    <string name="model_download_action">下载</string>
+    <string name="model_cancel_leave">取消当前模型操作并离开此页？正在进行的原生校验可能需要先返回，原有模型文件会保留。</string>
+    <string name="model_download_busy">请先完成或暂停其他模型下载，再导入文件。</string>
+    <string name="model_status_ready">已就绪</string>
+    <string name="model_status_missing">未安装</string>
+    <string name="model_optional_not_ready">已选择，但可选资源文件尚未安装。其他翻译功能仍可使用。</string>
+    <string name="mic_processing_segment">继续录音，同时处理前面的语音分段。</string>
+</resources>

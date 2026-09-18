@@ -116,6 +116,7 @@ android {
 dependencies {
     //implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation 'org.apache.commons:commons-compress:1.28.0'
     // Support libraries
     implementation 'com.google.code.gson:gson:2.14.0'
     implementation "com.google.android.material:material:1.9.0"  //1.9.0

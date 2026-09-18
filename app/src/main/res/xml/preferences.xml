@@ -45,14 +45,6 @@
         android:title="@string/preference_header_input"
         app:iconSpaceReserved="false"
         app:allowDividerBelow="true">
-        <androidx.preference.Preference
-            android:key="qwenAsrSettings"
-            android:title="@string/qwen_settings_title"
-            android:summary="@string/qwen_settings_summary"
-            app:iconSpaceReserved="false">
-            <intent android:targetPackage="nie.translator.rtranslator"
-                android:targetClass="nie.translator.rtranslator.settings.QwenSettingsActivity" />
-        </androidx.preference.Preference>
         <nie.translator.rtranslator.settings.SeekBarPreference
             android:key="micSensibilitySetting"
             android:layout="@layout/preference_seekbar"

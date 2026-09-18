@@ -49,7 +49,7 @@ public class ResourceManager implements MozillaLanguagesAdapter.ResourceManagerI
         @Override
         public void onDownloadClicked() {
             setState(ResourceManagerView.State.DOWNLOADING);
-            downloadManager.startDownload(downloadInfo);
+            ((Global) activity.getApplication()).models().closeForConfiguration(() -> downloadManager.startDownload(downloadInfo));
         }
 
         @Override
@@ -61,35 +61,12 @@ public class ResourceManager implements MozillaLanguagesAdapter.ResourceManagerI
         @Override
         public void onResumeClicked() {
             setState(ResourceManagerView.State.DOWNLOADING);
-            downloadManager.startDownload(downloadInfo);
+            ((Global) activity.getApplication()).models().closeForConfiguration(() -> downloadManager.startDownload(downloadInfo));
         }
 
         @Override
         public void onDeletePressed() {
-            DownloadGroupInfo hyMtDownloadInfo = ((Global) activity.getApplication()).getHyMtDownloadInfo();
-            DownloadGroupInfo madladDownloadInfo = ((Global) activity.getApplication()).getMadladDownloadInfo();
-            if(isMozillaDownload(downloadInfo) || downloadInfo.equals(hyMtDownloadInfo) || downloadInfo.equals(madladDownloadInfo)) {
-                //this is to prevent the user from deleting all the translation models
-                int numberOfModelsAvailable = 0;
-                for (DownloadGroupInfo downloadGroupInfo : downloadManager.getSavedDownloadStatus()) {
-                    if (isMozillaDownload(downloadGroupInfo)) {
-                        if (downloadGroupInfo.isAllDownloadCompleted()) {
-                            numberOfModelsAvailable++;
-                            break;
-                        }
-                    }
-                }
-                if (downloadManager.checkDownloadCompleted(hyMtDownloadInfo)) {
-                    numberOfModelsAvailable++;
-                }
-                if (downloadManager.checkDownloadCompleted(madladDownloadInfo)) {
-                    numberOfModelsAvailable++;
-                }
-                if (numberOfModelsAvailable <= 1) {
-                    showCannotDeleteDialog();
-                    return;
-                }
-            }
+            // The application and settings remain usable with an empty model library.
             showDeleteDialog();
         }
 
@@ -231,9 +208,12 @@ public class ResourceManager implements MozillaLanguagesAdapter.ResourceManagerI
             @Override
             public void onClick(View v) {
                 dialog.dismiss();
-                setState(ResourceManagerView.State.EMPTY, animateDeletion);
-                downloadManager.cancelDownload(downloadInfo);
-                if(clientListener != null) clientListener.onResourceDeleted();
+                ((Global) activity.getApplication()).models().closeForConfiguration(() -> {
+                    setState(ResourceManagerView.State.EMPTY, animateDeletion);
+                    downloadManager.cancelDownload(downloadInfo);
+                    ((Global) activity.getApplication()).updateLanguages();
+                    if(clientListener != null) clientListener.onResourceDeleted();
+                });
             }
         });
         cancelButton.setOnClickListener(new View.OnClickListener() {

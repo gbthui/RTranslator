@@ -129,19 +129,25 @@ public class SettingsActivity extends GeneralActivity {
         if (fragment != null) {
             if (fragment instanceof SettingsFragment) {
                 SettingsFragment settingsFragment = (SettingsFragment) fragment;
-                if (settingsFragment.isDownloading()) {
-                    showDownloadDialog();
-                }else {
-                    super.onBackPressed();
-                }
+                super.onBackPressed();
             }else if (fragment instanceof ModelManagerFragment) {
+                ModelManagerFragment manager = (ModelManagerFragment) fragment;
+                if (manager.isClosingModels()) { startFragment(SETTINGS_FRAGMENT, null); return; }
+                if (manager.hasActiveOperation()) {
+                    new MaterialAlertDialogBuilder(this, R.style.MyThemeOverlay_MaterialComponents_MaterialAlertDialog)
+                        .setMessage(R.string.model_cancel_leave)
+                        .setPositiveButton(android.R.string.ok, (d,w) -> { manager.cancelOperation(); startFragment(SETTINGS_FRAGMENT, null); })
+                        .setNegativeButton(android.R.string.cancel, null).show();
+                    return;
+                }
                 if(((ModelManagerFragment) fragment).checkSettingsChanged()){
                     showConfirmApplyDialog();
                 }else {
                     ((ModelManagerFragment) fragment).applySettings();
                 }
             }else if (fragment instanceof MozillaManagerFragment) {
-                startFragment(MODEL_MANAGER, null);
+                Bundle args = fragment.getArguments();
+                startFragment(MODEL_MANAGER, args == null ? null : args.getBundle("modelSelection"));
             }else{
                 super.onBackPressed();
             }

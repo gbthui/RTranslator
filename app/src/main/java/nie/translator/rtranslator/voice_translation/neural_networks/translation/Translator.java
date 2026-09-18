@@ -101,14 +101,15 @@ public class Translator extends NeuralNetworkApi {
     @Nullable
     private GuiMessage lastOutputText;
     private long currentResultID = 0;
-    private ArrayList<TranslateListener> callbacks = new ArrayList<>();
+    private final java.util.concurrent.CopyOnWriteArrayList<TranslateListener> callbacks = new java.util.concurrent.CopyOnWriteArrayList<>();
     private android.os.Handler mainHandler;   // handler that can be used to post to the main thread
     private final ArrayDeque<DataContainer> dataToTranslate = new ArrayDeque<>();
     private final Object lock = new Object();
     private final Object langResourcesLock = new Object();
     private final int EMPTY_BATCH_SIZE = 1;
     private boolean translatingMessages = false;
-    private boolean translating = false;
+    private volatile boolean translating = false;
+    private volatile boolean closed = false;
     private LanguageResourcesManager languageResourcesManager;
 
 
@@ -124,6 +125,8 @@ public class Translator extends NeuralNetworkApi {
     public void setTranslationStatus(int modelMode, boolean useMozillaForVoiceTranslation, boolean useTatoeba, boolean useTranslationDicts, GeneralListener listener){
         final Thread t = new Thread("textTranslation") {
             public void run() {
+                synchronized (langResourcesLock) {
+                if (closed) return;
                 try {
                     int oldMode = Translator.this.mode;
                     Translator.this.mode = modelMode;
@@ -163,10 +166,11 @@ public class Translator extends NeuralNetworkApi {
                         languageDetector = new LanguageDetector();
                         languageDetector.initialize(global, languageResourcesManager);
                     }
-                    mainHandler.post(() -> listener.onSuccess());
+                    postIfOpen(() -> { if (!closed) listener.onSuccess(); });
                 } catch (Exception e) {
                     e.printStackTrace();
-                    mainHandler.post(() -> listener.onFailure(new int[]{ErrorCodes.ERROR_LOADING_MODEL},0));
+                    postIfOpen(() -> { if (!closed) listener.onFailure(new int[]{ErrorCodes.ERROR_LOADING_MODEL},0); });
+                }
                 }
             }
         };
@@ -356,7 +360,7 @@ public class Translator extends NeuralNetworkApi {
                             public void onTranslatedText(String textToTranslate, String text, String[] synonyms, long resultID, boolean isFinal, ResultType resultType, CustomLocale languageOfText) {
                                 data.conversationMessageToTranslate.getPayload().setText(text);
                                 data.conversationMessageToTranslate.getPayload().setLanguage(data.languageOutput);
-                                mainHandler.post(() -> data.responseListener.onTranslatedMessage(data.conversationMessageToTranslate, resultID, isFinal));
+                                postIfOpen(() -> data.responseListener.onTranslatedMessage(data.conversationMessageToTranslate, resultID, isFinal));
                                 //we translate the next message in the queue
                                 if (dataToTranslate.size() >= 1) {
                                     translateMessage();
@@ -524,16 +528,17 @@ public class Translator extends NeuralNetworkApi {
     public void loadLanguageResources(@NonNull CustomLocale srcLang, @NonNull CustomLocale tgtLang, Global.RTranslatorMode rtranslatorMode, @Nullable GeneralListener listener){
         new Thread(() -> {
             synchronized (langResourcesLock) {
+                if (closed) return;
                 try {
                     //execution of language resource loading
                     languageResourcesManager.setLanguageResources(srcLang, tgtLang, rtranslatorMode);
                     //we notify the success of the loading
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onSuccess();
                     });
                 } catch (Exception e) {
                     e.printStackTrace();
-                    if(listener != null) mainHandler.post(() -> listener.onFailure(new int[]{0}, 0)); //todo: implementare una vera gestione degli errori
+                    if(listener != null) postIfOpen(() -> listener.onFailure(new int[]{0}, 0)); //todo: implementare una vera gestione degli errori
                 }
             }
         }).start();
@@ -542,16 +547,17 @@ public class Translator extends NeuralNetworkApi {
     public void loadSrcLangResourcesForPeer(CustomLocale lang, Peer peer, @Nullable GeneralListener listener){
         new Thread(() -> {
             synchronized (langResourcesLock) {
+                if (closed) return;
                 try {
                     //execution of language resource loading
                     languageResourcesManager.setSrcLangResourcesForPeer(lang, peer);
                     //we notify the success of the loading
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onSuccess();
                     });
                 } catch (Exception e) {
                     e.printStackTrace();
-                    if(listener != null) mainHandler.post(() -> listener.onFailure(new int[]{0}, 0)); //todo: implementare una vera gestione degli errori
+                    if(listener != null) postIfOpen(() -> listener.onFailure(new int[]{0}, 0)); //todo: implementare una vera gestione degli errori
                 }
             }
         }).start();
@@ -560,16 +566,17 @@ public class Translator extends NeuralNetworkApi {
     public void loadTgtLangResourcesForConversation(CustomLocale lang, @Nullable GeneralListener listener){
         new Thread(() -> {
             synchronized (langResourcesLock) {
+                if (closed) return;
                 try {
                     //execution of language resource loading
                     languageResourcesManager.setTgtLangResourcesForConversation(lang);
                     //we notify the success of the loading
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onSuccess();
                     });
                 } catch (Exception e) {
                     e.printStackTrace();
-                    if(listener != null) mainHandler.post(() -> listener.onFailure(new int[]{0}, 0)); //todo: implementare una vera gestione degli errori
+                    if(listener != null) postIfOpen(() -> listener.onFailure(new int[]{0}, 0)); //todo: implementare una vera gestione degli errori
                 }
             }
         }).start();
@@ -582,16 +589,17 @@ public class Translator extends NeuralNetworkApi {
     public void unloadSrcLangResourcesForPeer(Peer peer, @Nullable GeneralListener listener){
         new Thread(() -> {
             synchronized (langResourcesLock) {
+                if (closed) return;
                 try {
                     //execution of language resource unloading
                     languageResourcesManager.unloadSrcLangResourcesForPeer(peer);
                     //we notify the success of the unloading
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onSuccess();
                     });
                 } catch (Exception e) {
                     e.printStackTrace();
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onFailure(new int[]{0}, 0);
                     });    //todo: implementare una vera gestione degli errori
                 }
@@ -602,16 +610,17 @@ public class Translator extends NeuralNetworkApi {
     public void unloadAllLangResourcesForConversation(@Nullable GeneralListener listener){
         new Thread(() -> {
             synchronized (langResourcesLock) {
+                if (closed) return;
                 try {
                     //execution of language resource unloading
                     languageResourcesManager.unloadAllLangResourcesForConversation();
                     //we notify the success of the unloading
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onSuccess();
                     });
                 } catch (Exception e) {
                     e.printStackTrace();
-                    mainHandler.post(() -> {
+                    postIfOpen(() -> {
                         if(listener != null) listener.onFailure(new int[]{0}, 0);
                     });    //todo: implementare una vera gestione degli errori
                 }
@@ -636,6 +645,7 @@ public class Translator extends NeuralNetworkApi {
     }
 
     private void notifyResult(String textToTranslate, String text, @Nullable String[] synonyms, long resultID, boolean isFinal, TranslateListener.ResultType resultType, CustomLocale languageOfText) {
+        if (closed) return;
         for (int i = 0; i < callbacks.size(); i++) {
             callbacks.get(i).onTranslatedText(textToTranslate, text, synonyms, resultID, isFinal, resultType, languageOfText);
         }
@@ -647,7 +657,35 @@ public class Translator extends NeuralNetworkApi {
         }
     }
 
-    private void performTextTranslation(final String textToTranslate, final CustomLocale inputLanguage, final CustomLocale outputLanguage, int beamSize, boolean saveResults, Global.RTranslatorMode rtranslatorMode, @Nullable final TranslateListener responseListener) {
+    private void performTextTranslation(final String textToTranslate, final CustomLocale inputLanguage, final CustomLocale outputLanguage,
+            int beamSize, boolean saveResults, Global.RTranslatorMode rtranslatorMode, @Nullable TranslateListener listener) {
+        synchronized (langResourcesLock) {
+            if (closed) return;
+            performTextTranslationUnchecked(textToTranslate, inputLanguage, outputLanguage, beamSize, saveResults, rtranslatorMode, listener);
+        }
+    }
+
+    private boolean postIfOpen(Runnable callback) {
+        return mainHandler.post(() -> { if (!closed) callback.run(); });
+    }
+
+    public void closeAsync(Runnable done) {
+        closed = true;
+        callbacks.clear();
+        new Thread(() -> {
+            synchronized (langResourcesLock) {
+                for (OrtSession session : new OrtSession[]{encoderSession, decoderSession, cacheInitSession, embedSession, embedAndLmHeadSession}) {
+                    if (session != null) try { session.close(); } catch (Exception e) { Log.w("model-close", "Session close failed", e); }
+                }
+                encoderSession = decoderSession = cacheInitSession = embedSession = embedAndLmHeadSession = null;
+                if (languageDetector != null) languageDetector.close();
+                if (languageResourcesManager != null) languageResourcesManager.close();
+            }
+            mainHandler.post(done);
+        }, "close-translator").start();
+    }
+
+    private void performTextTranslationUnchecked(final String textToTranslate, final CustomLocale inputLanguage, final CustomLocale outputLanguage, int beamSize, boolean saveResults, Global.RTranslatorMode rtranslatorMode, @Nullable final TranslateListener responseListener) {
         try {
             long initTime = System.currentTimeMillis();
             String finalResult = null;
@@ -682,9 +720,9 @@ public class Translator extends NeuralNetworkApi {
                     Log.e("translation_error", "languages not supported");
                     // if the performMode and mode models don't support the input or output language we interrupt the translation and launch an error
                     if (responseListener != null) {
-                        mainHandler.post(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_LANGUAGE_NOT_SUPPORTED}, 0));
+                        postIfOpen(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_LANGUAGE_NOT_SUPPORTED}, 0));
                     } else {
-                        mainHandler.post(() -> notifyError(new int[]{ErrorCodes.ERROR_LANGUAGE_NOT_SUPPORTED}, 0));
+                        postIfOpen(() -> notifyError(new int[]{ErrorCodes.ERROR_LANGUAGE_NOT_SUPPORTED}, 0));
                     }
                     return;
                 }
@@ -732,7 +770,7 @@ public class Translator extends NeuralNetworkApi {
                 final String[] joinedStringOutput = {""};
                 for (int i = 0; i < textSplit.size(); i++) {
                     String finalSplitResult = null;
-                    if(global.isUseTranslationDictionaries()) {
+                    if(global.isUseTranslationDictionaries() && nie.translator.rtranslator.models.FeatureReadiness.dictionaries(global)) {
                         String[] dictionaryResult = performDictionaryTranslation(textSplit.get(i), inputLanguage, outputLanguage);
                         if(dictionaryResult != null && dictionaryResult.length > 0) {
                             finalSplitResult = dictionaryResult[0];
@@ -744,7 +782,7 @@ public class Translator extends NeuralNetworkApi {
                     }
                     if(finalSplitResult == null) {
                         isDictionaryResult = false;  //if this split is not translated by a dictionary we set isDictionaryResult to false
-                        if (global.isUseTatoeba()) {
+                        if (global.isUseTatoeba() && nie.translator.rtranslator.models.FeatureReadiness.tatoeba(global)) {
                             finalSplitResult = performTatoebaTranslation(textSplit.get(i), inputLanguage, outputLanguage);
                         }
 
@@ -774,7 +812,7 @@ public class Translator extends NeuralNetworkApi {
             }else{
                 //perform text translation using mozilla models
                 android.util.Log.i("translator", "Translating using Bergamot models...");
-                if(global.isUseTranslationDictionaries()) {
+                if(global.isUseTranslationDictionaries() && nie.translator.rtranslator.models.FeatureReadiness.dictionaries(global)) {
                     String[] dictionaryResult = performDictionaryTranslation(textToTranslate, inputLanguage, outputLanguage);
                     if(dictionaryResult != null && dictionaryResult.length > 0) {
                         finalResult = dictionaryResult[0];
@@ -785,7 +823,7 @@ public class Translator extends NeuralNetworkApi {
                     }
                 }
                 if(finalResult == null) {
-                    if (global.isUseTatoeba()) {
+                    if (global.isUseTatoeba() && nie.translator.rtranslator.models.FeatureReadiness.tatoeba(global)) {
                         finalResult = performTatoebaTranslation(textToTranslate, inputLanguage, outputLanguage);
                     }
                     synchronized (langResourcesLock) {
@@ -815,17 +853,17 @@ public class Translator extends NeuralNetworkApi {
             }
             String[] finalSynonyms = synonyms;
             if (responseListener != null) {
-                mainHandler.post(() -> responseListener.onTranslatedText(textToTranslate, finalResultConst, finalSynonyms, currentResultIDCopy, true, resultType, outputLanguage));
+                postIfOpen(() -> responseListener.onTranslatedText(textToTranslate, finalResultConst, finalSynonyms, currentResultIDCopy, true, resultType, outputLanguage));
             } else {
-                mainHandler.post(() -> notifyResult(textToTranslate, finalResultConst, finalSynonyms, currentResultIDCopy, true, resultType, outputLanguage));
+                postIfOpen(() -> notifyResult(textToTranslate, finalResultConst, finalSynonyms, currentResultIDCopy, true, resultType, outputLanguage));
             }
             currentResultID++;
         } catch (Exception e) {
             e.printStackTrace();
             if (responseListener != null) {
-                mainHandler.post(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
+                postIfOpen(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
             } else {
-                mainHandler.post(() -> notifyError(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
+                postIfOpen(() -> notifyError(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
             }
         }
     }
@@ -852,14 +890,14 @@ public class Translator extends NeuralNetworkApi {
                     for (int j = 0; j < srcSentences.length; j++) {
                         if (normalizedText.equalsIgnoreCase(TextTools.normalizeText(srcSentences[j]))) {
                             String textResult = languageResourcesManager.getTatoebaDb().getSentence(tgtIds[j]);
-                            //mainHandler.post(() -> Toast.makeText(global, "Tatoeba sentence found: " + textResult, Toast.LENGTH_SHORT).show());
+                            //postIfOpen(() -> Toast.makeText(global, "Tatoeba sentence found: " + textResult, Toast.LENGTH_SHORT).show());
                             android.util.Log.i("status_tatoeba", "Tatoeba sentence found: " + textResult);
                             android.util.Log.i("performance_tatoeba", "TATOEBA SEARCH DONE IN: " + (System.currentTimeMillis() - initTime) + "ms");
                             return textResult;
                         }
                     }
                 } else {
-                    //mainHandler.post(() -> Toast.makeText(global, "Tatoeba sentence not found", Toast.LENGTH_SHORT).show());
+                    //postIfOpen(() -> Toast.makeText(global, "Tatoeba sentence not found", Toast.LENGTH_SHORT).show());
                     android.util.Log.i("status_tatoeba", "Tatoeba sentence not found");
                 }
                 android.util.Log.i("performance_tatoeba", "TATOEBA SEARCH DONE IN: " + (System.currentTimeMillis() - initTime) + "ms");
@@ -896,9 +934,9 @@ public class Translator extends NeuralNetworkApi {
             android.util.Log.i("performance", "Encoder done in: " + (System.currentTimeMillis() - time) + "ms");
             if (encoderResult == null) {
                 if (responseListener != null) {
-                    mainHandler.post(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
+                    postIfOpen(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
                 } else {
-                    mainHandler.post(() -> notifyError(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
+                    postIfOpen(() -> notifyError(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
                 }
                 throw new Exception();
             }
@@ -919,9 +957,9 @@ public class Translator extends NeuralNetworkApi {
                 }
                 final long currentResultIDCopy = currentResultID;  //we do a copy because otherwise the currentResultID is incremented before notifying the message (due to the notification being executed in the mainThread)
                 if (responseListener != null) {
-                    mainHandler.post(() -> responseListener.onTranslatedText(textToTranslate, outputText, synonyms, currentResultIDCopy, false, resultType, outputLanguage));
+                    postIfOpen(() -> responseListener.onTranslatedText(textToTranslate, outputText, synonyms, currentResultIDCopy, false, resultType, outputLanguage));
                 } else {
-                    mainHandler.post(() -> notifyResult(textToTranslate, outputText, synonyms, currentResultIDCopy, false, resultType, outputLanguage));
+                    postIfOpen(() -> notifyResult(textToTranslate, outputText, synonyms, currentResultIDCopy, false, resultType, outputLanguage));
                 }
             }
 
@@ -929,9 +967,9 @@ public class Translator extends NeuralNetworkApi {
             public void onFailure(int[] reasons, long value) {
                 //we do not return the partial results and notify an error
                 if (responseListener != null) {
-                    mainHandler.post(() -> responseListener.onFailure(reasons, value));
+                    postIfOpen(() -> responseListener.onFailure(reasons, value));
                 } else {
-                    mainHandler.post(() -> notifyError(reasons, value));
+                    postIfOpen(() -> notifyError(reasons, value));
                 }
             }
         };
@@ -1447,9 +1485,9 @@ public class Translator extends NeuralNetworkApi {
                  IllegalAccessException | InstantiationException e) {
             e.printStackTrace();
             if(responseListener != null) {
-                mainHandler.post(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
+                postIfOpen(() -> responseListener.onFailure(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
             }else{
-                mainHandler.post(() -> notifyError(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
+                postIfOpen(() -> notifyError(new int[]{ErrorCodes.ERROR_EXECUTING_MODEL}, 0));
             }
         }
         return null;

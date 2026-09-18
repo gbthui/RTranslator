@@ -75,6 +75,25 @@
             app:srcCompat="@drawable/settings_icon" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <TextView
+        android:id="@+id/modelStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:padding="12dp"
+        android:minHeight="48dp"
+        android:background="?attr/selectableItemBackground"
+        android:textColor="@color/primary_very_dark"
+        android:fontFamily="@font/nunito_sans_semibold"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:accessibilityLiveRegion="polite"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/toolbarTranslatorContainer" />
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/constraintLayout"
         android:layout_width="match_parent"
@@ -82,7 +101,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/toolbarTranslatorContainer"
+        app:layout_constraintTop_toBottomOf="@id/modelStatus"
         app:layout_constraintVertical_bias="0.0">
 
         <androidx.constraintlayout.widget.Guideline

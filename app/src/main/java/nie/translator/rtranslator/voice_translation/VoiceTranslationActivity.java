@@ -102,7 +102,9 @@ public class VoiceTranslationActivity extends GeneralActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        // Saved voice fragments may refer to models that died with the process.
+        // Restore the mode only after its dependencies have been loaded.
+        super.onCreate(null);
         setContentView(R.layout.activity_main);
         global = (Global) getApplication();
         mainHandler = new Handler(Looper.getMainLooper());
@@ -168,6 +170,11 @@ public class VoiceTranslationActivity extends GeneralActivity {
     }
 
     public void setFragment(int fragmentName, boolean requestPermission) {
+        if (fragmentName != TRANSLATION_FRAGMENT && !global.models().ready(true)) {
+            setFragment(TRANSLATION_FRAGMENT, false);
+            prepareFeature(true, () -> setFragment(fragmentName, requestPermission));
+            return;
+        }
         switch (fragmentName) {
             case PAIRING_FRAGMENT: {
                 // possible stop of the Conversation and WalkieTalkie Service
@@ -188,7 +195,7 @@ public class VoiceTranslationActivity extends GeneralActivity {
                             currentFragment = PAIRING_FRAGMENT;
                             saveFragment();
                             //fragment=paringFragment;
-                        }else if(global.getBluetoothCommunicator().isBluetoothLeSupported()){
+                        }else if(global.getBluetoothCommunicator() == null){
                             Toast.makeText(global, "Error with Bluetooth, please restart the app", Toast.LENGTH_SHORT).show();
                         }else{
                             Toast.makeText(global, R.string.error_missing_bluetooth_le, Toast.LENGTH_LONG).show();
@@ -263,6 +270,54 @@ public class VoiceTranslationActivity extends GeneralActivity {
                 break;
             }
         }
+    }
+
+    private long featureRequest;
+    private com.google.android.material.snackbar.Snackbar loadingModels;
+
+    public void openModelManager() {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        intent.putExtra("startWithModelManager", true);
+        startActivity(intent);
+    }
+
+    public void showModelProblem(String message) {
+        if (isFinishing() || isDestroyed()) return;
+        new MaterialAlertDialogBuilder(this, R.style.MyThemeOverlay_MaterialComponents_MaterialAlertDialog)
+            .setTitle(R.string.models_not_ready).setMessage(message)
+            .setPositiveButton(R.string.manage_models, (dialog, which) -> openModelManager())
+            .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    public void prepareFeature(boolean voice, Runnable afterReady) {
+        final long request = ++featureRequest;
+        String missing = nie.translator.rtranslator.models.FeatureReadiness.missing(global, voice);
+        if (!missing.isEmpty()) { showModelProblem(missing); return; }
+        if (loadingModels != null) loadingModels.dismiss();
+        loadingModels = com.google.android.material.snackbar.Snackbar.make(findViewById(R.id.fragment_container),
+            R.string.model_loading, com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE)
+            .setAction(R.string.manage_models, view -> openModelManager());
+        loadingModels.show();
+        global.models().prepare(voice, new nie.translator.rtranslator.models.ModelRuntime.Listener() {
+            @Override public void onReady() {
+                if (request != featureRequest || isFinishing() || isDestroyed()) return;
+                if (loadingModels != null) loadingModels.dismiss();
+                afterReady.run();
+            }
+            @Override public void onUnavailable(String message) {
+                if (request != featureRequest || isFinishing() || isDestroyed()) return;
+                if (loadingModels != null) loadingModels.dismiss();
+                Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                if (current instanceof TranslationFragment) ((TranslationFragment) current).refreshModelReadiness();
+                showModelProblem(message);
+            }
+        });
+    }
+
+    @Override protected void onStop() {
+        featureRequest++;
+        if (loadingModels != null) loadingModels.dismiss();
+        super.onStop();
     }
 
     public void saveFragment() {

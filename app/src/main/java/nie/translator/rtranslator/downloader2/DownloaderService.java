@@ -89,6 +89,7 @@ public class DownloaderService extends Service {
             public void onAllCompleted(DownloadGroupInfo downloadGroup) {
                 updateDownloadGroupInfoPreference(downloadGroup);
                 notifyAllCompleted(downloadGroup);
+                ((nie.translator.rtranslator.Global)getApplication()).models().resourcesChanged();
                 int i = downloaders.indexOf(downloadGroup);
                 removeDownload(i);
             }
