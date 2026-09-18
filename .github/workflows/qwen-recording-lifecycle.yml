@@ -1,0 +1,60 @@
+name: Apply recording lifecycle guards
+on:
+  push:
+    branches: [feat/qwen-asr-cancellation]
+    paths: [.github/workflows/qwen-recording-lifecycle.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'gbthui/RTranslator'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/qwen-asr-cancellation
+      - name: Guard delayed recorder restarts and assert shutdown ordering
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          def blob(path):
+              return subprocess.check_output(['git', 'hash-object', str(path)], text=True).strip()
+          p = Path('app/src/main/java/nie/translator/rtranslator/voice_translation/VoiceTranslationService.java')
+          assert blob(p) == 'b30964ed7b8a9b9e12a9d421f2701529b1906be4'
+          s = p.read_text()
+          edits = [
+            ('public abstract class VoiceTranslationService extends GeneralService {', 'public abstract class VoiceTranslationService extends GeneralService {\n    private volatile boolean serviceDestroyed;'),
+            ('void onUtteranceStarting(GuiMessage message, boolean first) {', 'void onUtteranceStarting(GuiMessage message, boolean first) {\n                if (serviceDestroyed) return;'),
+            ('void onUtteranceFinished(GuiMessage message, boolean last) {', 'void onUtteranceFinished(GuiMessage message, boolean last) {\n                if (serviceDestroyed) return;'),
+            ('if (shouldDeactivateMicDuringTTS()) {', 'if (!serviceDestroyed && ((Global) getApplication()).models().ready(true) && shouldDeactivateMicDuringTTS()) {'),
+            ('public void startVoiceRecorder() {', 'public void startVoiceRecorder() {\n        if (serviceDestroyed || !((Global) getApplication()).models().ready(true)) return;'),
+            ('public synchronized void speak(GuiMessage message, CustomLocale language) {', 'public synchronized void speak(GuiMessage message, CustomLocale language) {\n        if (serviceDestroyed) return;'),
+            ('public synchronized void onDestroy() {', 'public synchronized void onDestroy() {\n        serviceDestroyed = true;\n        if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);\n        if (mainTTSHandler != null) mainTTSHandler.removeCallbacksAndMessages(null);')
+          ]
+          for old, new in edits:
+              assert s.count(old) == 1, old
+              s = s.replace(old, new)
+          p.write_text(s)
+          assert blob(p) == '717488c8a2176cf54f756a8db8b93df7808f7fa4'
+          t = Path('tools/tests/check-model-ui.py')
+          assert blob(t) == '89be1bb9ae81542d6168cf01cdbb57842db16425'
+          t.write_text(t.read_text() + '''
+          voice_service = (j/'voice_translation/VoiceTranslationService.java').read_text()
+          assert 'if (serviceDestroyed || !((Global) getApplication()).models().ready(true)) return;' in voice_service
+          assert 'if (!serviceDestroyed && ((Global) getApplication()).models().ready(true) && shouldDeactivateMicDuringTTS())' in voice_service
+          destroy = voice_service[voice_service.index('public synchronized void onDestroy()'):voice_service.index('// communication')]
+          assert destroy.index('serviceDestroyed = true') < destroy.index('ttsEngine.stop()')
+          assert 'mainHandler.removeCallbacksAndMessages(null)' in destroy
+          print('PASS stopped or unconfigured voice service cannot be restarted by delayed TTS callbacks')
+          ''')
+          assert blob(t) == '4d9d4323cff44744bb82ff7a23f3a4e9d9d5d28f'
+          PY
+          bash tools/test-qwen-core.sh
+          bash tools/test-model-library.sh
+          git add app/src/main/java/nie/translator/rtranslator/voice_translation/VoiceTranslationService.java tools/tests/check-model-ui.py
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: prevent delayed TTS callbacks from reviving stopped or unconfigured recorders'
+          git push origin HEAD:feat/qwen-asr-cancellation
