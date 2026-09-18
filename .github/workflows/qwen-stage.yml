@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feat/qwen-asr-cancellation
-      - name: Verify and apply the exact tested source patch
+      - name: Verify and apply source files only
         run: |
           python3 - <<'PY'
           import base64, hashlib, lzma, pathlib, subprocess
@@ -23,13 +23,14 @@ jobs:
           assert hashlib.sha256(data).hexdigest() == '41bf10430d0629ab8403ca8858e8177934a3ed40ae6cf8888f49a486acb562fc'
           patch = pathlib.Path('/tmp/qwen-feature.patch')
           patch.write_bytes(data)
-          subprocess.run(['git', 'apply', '--check', '--index', str(patch)], check=True)
-          subprocess.run(['git', 'apply', '--index', str(patch)], check=True)
+          exclude = '--exclude=.github/workflows/qwen-backend.yml'
+          subprocess.run(['git', 'apply', '--check', '--index', exclude, str(patch)], check=True)
+          subprocess.run(['git', 'apply', '--index', exclude, str(patch)], check=True)
           whisper = pathlib.Path('app/src/main/java/nie/translator/rtranslator/voice_translation/neural_networks/voice/WhisperRecognizer.java')
           whisper.write_text('\n'.join(line.rstrip() for line in whisper.read_text().splitlines()) + '\n')
           subprocess.run(['git', 'add', str(whisper)], check=True)
           PY
-          git rm -r tools/.qwen-stage .github/workflows/qwen-stage.yml
+          git rm -r tools/.qwen-stage
           bash tools/test-qwen-core.sh
           git diff --cached --check
       - name: Commit implementation without changing the default branch
