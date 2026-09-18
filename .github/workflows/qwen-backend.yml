@@ -76,6 +76,7 @@ jobs:
           restore-keys: qwen-gradle-${{ runner.os }}-
       - name: Compile and package Android debug APK
         run: |
+          set -o pipefail
           chmod +x gradlew
           ./gradlew :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee android-build.log
       - name: Verify APK contains all runtime libraries
