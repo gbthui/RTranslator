@@ -2,12 +2,19 @@ name: Qwen backend validation
 on:
   pull_request:
     branches: [v3.00]
+    paths:
+      - 'app/**'
+      - 'docs/**'
+      - 'tools/**'
+      - '!tools/.ux-stage/**'
+      - '!tools/.qwen-stage/**'
+      - '.github/workflows/qwen-backend.yml'
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: qwen-backend-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   core:
     runs-on: ubuntu-latest
@@ -19,8 +26,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Java cancellation and lifecycle regressions
-        run: bash tools/test-qwen-core.sh
+      - name: Cancellation, model-library and recording-window regressions
+        run: |
+          bash tools/test-qwen-core.sh
+          bash tools/test-model-library.sh
       - name: Build-script syntax and patch hygiene
         run: |
           python3 -m py_compile tools/prepare-qwen-runtimes.py tools/patch-qwen-sherpa.py tools/download-qwen-test-models.py
@@ -58,20 +67,29 @@ jobs:
         with:
           path: .gradle/qwen-runtimes
           key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: qwen-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: qwen-gradle-${{ runner.os }}-
       - name: Compile and package Android debug APK
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee android-build.log
       - name: Verify APK contains all runtime libraries
         run: |
           python3 - <<'PY'
-          import glob, zipfile
+          import glob, zipfile, hashlib, pathlib, subprocess
           apk = glob.glob('app/build/outputs/apk/debug/*.apk')[0]
           with zipfile.ZipFile(apk) as z:
               for name in ('onnx', 'gguf_cpu', 'gguf_vulkan'):
                   assert 'lib/arm64-v8a/librtranslator_qwen_' + name + '.so' in z.namelist(), name
               assert 'lib/arm64-v8a/libonnxruntime.so' in z.namelist()
               assert 'assets/qwen-runtime.properties' in z.namelist()
+          pathlib.Path(apk + '.sha256').write_text(hashlib.sha256(pathlib.Path(apk).read_bytes()).hexdigest() + '  ' + pathlib.Path(apk).name + '\n')
+          pathlib.Path('build-commit.txt').write_text(subprocess.check_output(['git','rev-parse','HEAD']).decode())
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -79,6 +97,9 @@ jobs:
           name: qwen-android-build
           path: |
             app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/debug/*.sha256
             .gradle/qwen-runtimes/runtime.json
+            android-build.log
+            build-commit.txt
           include-hidden-files: true
           retention-days: 7
