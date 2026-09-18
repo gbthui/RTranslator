@@ -54,6 +54,7 @@ import nie.translator.rtranslator.voice_translation.neural_networks.voice.Record
 
 
 public abstract class VoiceTranslationService extends GeneralService {
+    private volatile boolean serviceDestroyed;
     private static final int TIME_BEFORE_REACTIVATING_MIC_AFTER_TTS = 500;
 
     public static final int AUTO_LANGUAGE = 0;
@@ -132,6 +133,7 @@ public abstract class VoiceTranslationService extends GeneralService {
         ttsListener = new TTSEngine.TTSEngineListener() {
             @Override
             void onUtteranceStarting(GuiMessage message, boolean first) {
+                if (serviceDestroyed) return;
                 //if (ttsEngine != null && shouldDeactivateMicDuringTTS() && ttsEngine.isEmpty() && !ttsEngine.isPaused()) {
                 notifyTTSStarted(String.valueOf(message.getMessageID()));
                 if (first && shouldDeactivateMicDuringTTS()) {
@@ -142,6 +144,7 @@ public abstract class VoiceTranslationService extends GeneralService {
 
             @Override
             void onUtteranceFinished(GuiMessage message, boolean last) {
+                if (serviceDestroyed) return;
                 if(message != null) {
                     notifyTTSDone(String.valueOf(message.getMessageID()));
                 }
@@ -150,7 +153,7 @@ public abstract class VoiceTranslationService extends GeneralService {
                     mainHandler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
-                            if (shouldDeactivateMicDuringTTS()) {
+                            if (!serviceDestroyed && ((Global) getApplication()).models().ready(true) && shouldDeactivateMicDuringTTS()) {
                                 if (!isMicMute) {
                                     startVoiceRecorder();
                                 }
@@ -228,6 +231,7 @@ public abstract class VoiceTranslationService extends GeneralService {
     }*/
 
     public void startVoiceRecorder() {
+        if (serviceDestroyed || !((Global) getApplication()).models().ready(true)) return;
         Log.i("recorder", "recorder started");
         if (!Tools.hasPermissions(this, Global.REQUIRED_PERMISSIONS_VOICE)) {
             notifyError(new int[]{MISSING_MIC_PERMISSION}, -1);
@@ -274,6 +278,7 @@ public abstract class VoiceTranslationService extends GeneralService {
 
     // tts
     public synchronized void speak(GuiMessage message, CustomLocale language) {
+        if (serviceDestroyed) return;
         synchronized (mLock) {
             if (ttsEngine != null && ttsEngine.isActive()) {
                 ttsEngine.speak(message, language);
@@ -343,6 +348,9 @@ public abstract class VoiceTranslationService extends GeneralService {
 
     @Override
     public synchronized void onDestroy() {
+        serviceDestroyed = true;
+        if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
+        if (mainTTSHandler != null) mainTTSHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
         // Stop listening to voice
         stopVoiceRecorder();
