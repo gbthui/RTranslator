@@ -1,0 +1,20 @@
+name: Qwen UX source snapshot
+on:
+  push:
+    branches: [feat/qwen-asr-cancellation]
+    paths: [.github/workflows/qwen-ux-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: git archive --format=tar HEAD > rtranslator-ux-source.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rtranslator-ux-source
+          path: rtranslator-ux-source.tar
+          retention-days: 3
