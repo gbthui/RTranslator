@@ -7,7 +7,7 @@ permissions:
   contents: read
 concurrency:
   group: qwen-backend-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   core:
     runs-on: ubuntu-latest
@@ -46,12 +46,18 @@ jobs:
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
           sudo apt-get update
           sudo apt-get install -y ninja-build glslc libvulkan-dev spirv-headers
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: runtime-cache
         with:
           path: .gradle/qwen-runtimes
           key: qwen-arm64-ndk28c-${{ hashFiles('tools/prepare-qwen-runtimes.py', 'tools/patch-qwen-sherpa.py', 'app/src/main/cpp/qwen/**') }}
       - name: Build isolated ONNX, GGUF CPU and GGUF Vulkan libraries
         run: python3 tools/prepare-qwen-runtimes.py --ndk "$ANDROID_HOME/ndk/28.2.13676358"
+      - uses: actions/cache/save@v4
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        with:
+          path: .gradle/qwen-runtimes
+          key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
       - name: Compile and package Android debug APK
         run: |
           chmod +x gradlew
@@ -87,19 +93,30 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: runtime-cache
         with:
           path: .gradle/qwen-host
           key: qwen-linux-${{ hashFiles('tools/prepare-qwen-runtimes.py', 'tools/patch-qwen-sherpa.py', 'app/src/main/cpp/qwen/**') }}
       - name: Build the production JNI sources for host CPU
         run: python3 tools/prepare-qwen-runtimes.py --host --output .gradle/qwen-host
+      - uses: actions/cache/save@v4
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        with:
+          path: .gradle/qwen-host
+          key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
       - name: Fetch verified test weights and fixtures
+        id: fixtures
         run: python3 tools/download-qwen-test-models.py .gradle/qwen-smoke-models
-      - name: Transcribe, cancel and reuse both real backends
+      - name: GGUF real transcription, cancellation and reuse
         run: |
           set -o pipefail
-          bash tools/test-qwen-native.sh gguf .gradle/qwen-smoke-models/Qwen3-ASR-0.6B-Q4_K_M.gguf .gradle/qwen-smoke-models/jfk.wav .gradle/qwen-smoke-models/zh.wav | tee gguf-smoke.log
-          bash tools/test-qwen-native.sh onnx .gradle/qwen-smoke-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 .gradle/qwen-smoke-models/jfk.wav .gradle/qwen-smoke-models/zh.wav | tee onnx-smoke.log
+          bash tools/test-qwen-native.sh gguf .gradle/qwen-smoke-models/Qwen3-ASR-0.6B-Q4_K_M.gguf .gradle/qwen-smoke-models/jfk.wav .gradle/qwen-smoke-models/zh.wav 2>&1 | tee gguf-smoke.log
+      - name: ONNX real transcription, cancellation and reuse
+        if: ${{ !cancelled() && steps.fixtures.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash tools/test-qwen-native.sh onnx .gradle/qwen-smoke-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 .gradle/qwen-smoke-models/jfk.wav .gradle/qwen-smoke-models/zh.wav 2>&1 | tee onnx-smoke.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
