@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import nie.translator.rtranslator.Global;
-import nie.translator.rtranslator.downloader2.DownloadGroupInfo;
-import nie.translator.rtranslator.downloader2.DownloadInfo;
+import nie.translator.rtranslator.downloader2/DownloadGroupInfo;
+import nie.translator.rtranslator.downloader2/DownloadInfo;
 import nie.translator.rtranslator.tools.DownloaderTools;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.qwen.CancellationToken;
 
@@ -58,10 +58,10 @@ public final class LegacyModelImports {
                 List<String> languages = new ArrayList<>();
                 if ("Mozilla".equals(kind)) {
                     // One language folder (e.g. zh/{zhen,enzh}) or a whole Mozilla folder.
-                    String code = source.getName();
-                    if (code != null && code.matches("[a-z]{2,3}")) {
+                    String folderName = source.getName();
+                    if (folderName != null && folderName.matches("[a-z]{2,3}")) {
                         File wrapper = new File(staged.getParentFile(), ".mozilla-import-" + UUID.randomUUID());
-                        if (!wrapper.mkdir() || !staged.renameTo(new File(wrapper, code))) throw new IOException("Cannot stage language model");
+                        if (!wrapper.mkdir() || !staged.renameTo(new File(wrapper, folderName))) throw new IOException("Cannot stage language model");
                         QwenDownloads.removeTree(staged); staged = wrapper;
                     }
                     languages = ModelFiles.mozillaLanguages(staged);
