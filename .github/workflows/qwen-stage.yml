@@ -25,6 +25,9 @@ jobs:
           patch.write_bytes(data)
           subprocess.run(['git', 'apply', '--check', '--index', str(patch)], check=True)
           subprocess.run(['git', 'apply', '--index', str(patch)], check=True)
+          whisper = pathlib.Path('app/src/main/java/nie/translator/rtranslator/voice_translation/neural_networks/voice/WhisperRecognizer.java')
+          whisper.write_text('\n'.join(line.rstrip() for line in whisper.read_text().splitlines()) + '\n')
+          subprocess.run(['git', 'add', str(whisper)], check=True)
           PY
           git rm -r tools/.qwen-stage .github/workflows/qwen-stage.yml
           bash tools/test-qwen-core.sh
