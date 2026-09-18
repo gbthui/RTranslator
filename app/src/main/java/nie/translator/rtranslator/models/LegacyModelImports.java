@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import nie.translator.rtranslator.Global;
-import nie.translator.rtranslator.downloader2/DownloadGroupInfo;
-import nie.translator.rtranslator.downloader2/DownloadInfo;
+import nie.translator.rtranslator.downloader2.DownloadGroupInfo;
+import nie.translator.rtranslator.downloader2.DownloadInfo;
 import nie.translator.rtranslator.tools.DownloaderTools;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.qwen.CancellationToken;
 
