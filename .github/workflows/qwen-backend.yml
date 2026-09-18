@@ -38,6 +38,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - name: Install SDK and native dependencies
         run: |
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
@@ -71,6 +74,7 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             .gradle/qwen-runtimes/runtime.json
+          include-hidden-files: true
           retention-days: 7
   native-cpu-smoke:
     runs-on: ubuntu-latest
@@ -104,4 +108,5 @@ jobs:
             .gradle/qwen-host/runtime.json
             .gradle/qwen-smoke-models/provenance.json
             *-smoke.log
+          include-hidden-files: true
           retention-days: 7
