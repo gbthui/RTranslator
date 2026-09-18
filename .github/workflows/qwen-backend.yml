@@ -1,0 +1,36 @@
+name: Qwen backend validation
+on:
+  push:
+    branches: [feat/qwen-asr-cancellation]
+  pull_request:
+    branches: [v3.00]
+permissions:
+  contents: read
+concurrency:
+  group: qwen-backend-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive exact application and runtime sources
+        run: |
+          mkdir -p provenance
+          git archive --format=tar HEAD > provenance/rtranslator-source.tar
+          git init runtime-source
+          git -C runtime-source remote add origin https://github.com/k2-fsa/sherpa-onnx.git
+          git -C runtime-source fetch --depth=1 origin 13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
+          git -C runtime-source archive --format=tar FETCH_HEAD > provenance/sherpa-source.tar
+          git init gguf-source
+          git -C gguf-source remote add origin https://github.com/handy-computer/transcribe.cpp.git
+          git -C gguf-source fetch --depth=1 origin 63a44d9239d610b3908e8a66b384924cd4a77217
+          git -C gguf-source archive --format=tar FETCH_HEAD > provenance/transcribe-source.tar
+          sha256sum provenance/*.tar > provenance/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-source-provenance
+          path: provenance/
+          retention-days: 3
