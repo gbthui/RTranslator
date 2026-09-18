@@ -1,0 +1,21 @@
+<resources>
+    <string name="qwen_settings_title">Speech recognition backend</string>
+    <string name="qwen_settings_summary">Whisper or local Qwen3-ASR (ONNX / GGUF)</string>
+    <string name="qwen_details">Import Qwen3-ASR-0.6B weights first. ONNX expects the sherpa-onnx INT8 folder including tokenizer; GGUF expects one transcribe.cpp qwen3_asr file, not a llama.cpp decoder/mmproj pair. Imports are copied into private storage and CPU-validated before activation. Speech modes close when importing or switching. Qwen supports 30 languages, not Urdu. Choose Whisper for unsupported languages. Old model generations are kept until you delete that backend’s models.</string>
+    <string name="qwen_whisper">Whisper Small (existing backend)</string>
+    <string name="qwen_onnx">Qwen3-ASR · sherpa-onnx</string>
+    <string name="qwen_gguf">Qwen3-ASR · GGUF / transcribe.cpp</string>
+    <string name="qwen_hardware">Try hardware acceleration (ONNX: NNAPI; GGUF: Vulkan). This does not select the fastest backend.</string>
+    <string name="qwen_import_onnx">Import and use ONNX model folder</string>
+    <string name="qwen_import_gguf">Import and use GGUF model file</string>
+    <string name="qwen_apply">Apply selection / retry hardware</string>
+    <string name="qwen_delete">Delete all models for selected Qwen backend</string>
+    <string name="qwen_delete_confirm">Delete all imported versions for this backend and switch to Whisper?</string>
+    <string name="qwen_return">Return to translator</string>
+    <string name="qwen_cancel">Cancel operation</string>
+    <string name="qwen_installed">Installed: %1$s · %2$s</string>
+    <string name="qwen_working">Closing active recognition, then validating or importing the model…</string>
+    <string name="qwen_cancelled">Cancelled. The previous model selection is unchanged.</string>
+    <string name="qwen_failed">Could not complete the operation.</string>
+    <string name="qwen_missing_model">Import a compatible model for this backend first.</string>
+</resources>

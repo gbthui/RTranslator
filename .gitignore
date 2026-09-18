@@ -7,3 +7,7 @@
 .externalNativeBuild
 app/.cxx
 app/release
+
+# Local Python build helpers
+__pycache__/
+*.pyc

@@ -1,0 +1,13 @@
+// Model weights are imported by the user and are never bundled in the APK.
+def runtimeDir = rootProject.file('.gradle/qwen-runtimes')
+android.sourceSets.main.jniLibs.srcDir new File(runtimeDir, 'jni')
+android.sourceSets.main.assets.srcDir new File(runtimeDir, 'assets')
+def verifyQwen = tasks.register('verifyQwenRuntimes', Exec) {
+    workingDir rootProject.projectDir
+    commandLine 'python3', 'tools/prepare-qwen-runtimes.py', '--verify-only'
+    inputs.dir rootProject.file('app/src/main/cpp/qwen')
+    inputs.file rootProject.file('tools/patch-qwen-sherpa.py')
+    inputs.file rootProject.file('tools/prepare-qwen-runtimes.py')
+    outputs.dir runtimeDir
+}
+preBuild.dependsOn verifyQwen

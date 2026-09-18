@@ -1,0 +1,4 @@
+{
+  global: Java_nie_translator_rtranslator_voice_1translation_neural_1networks_voice_qwen_QwenNative_*;
+  local: *;
+};

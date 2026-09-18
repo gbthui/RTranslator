@@ -173,7 +173,7 @@ public class Global extends Application implements DefaultLifecycleObserver {
                     .setSilenceDurationMs(300)
                     .setSpeechDurationMs(50)
                     .build();
-            speechRecognizer = new Recognizer(this, true, initListener);
+            speechRecognizer = Recognizer.create(this, initListener);
         }else{
             initListener.onInitializationFinished();
         }
@@ -562,7 +562,17 @@ public class Global extends Application implements DefaultLifecycleObserver {
     }
 
     public void deleteSpeechRecognizer(){
+        Recognizer old = speechRecognizer;
         speechRecognizer = null;
+        if (old != null) old.destroy();
+    }
+
+    /** Complete native teardown before settings replace a model on disk. */
+    public void closeSpeechRecognizer(Runnable afterClose) {
+        Recognizer old = speechRecognizer;
+        speechRecognizer = null;
+        if (old == null) afterClose.run();
+        else old.closeAsync(afterClose);
     }
 
     public boolean isForeground() {

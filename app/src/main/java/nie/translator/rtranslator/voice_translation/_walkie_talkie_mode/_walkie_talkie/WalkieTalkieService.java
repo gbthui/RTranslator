@@ -38,6 +38,8 @@ import nie.translator.rtranslator.voice_translation._conversation_mode._conversa
 import nie.translator.rtranslator.voice_translation.neural_networks.NeuralNetworkApiResult;
 import nie.translator.rtranslator.voice_translation.neural_networks.translation.Translator;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.Recognizer;
+import nie.translator.rtranslator.voice_translation.neural_networks.voice.RecognizerAutoListener;
+import nie.translator.rtranslator.voice_translation.neural_networks.voice.qwen.QwenLanguages;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.RecognizerListener;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.RecognizerMultiListener;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.Recorder;
@@ -66,6 +68,7 @@ public class WalkieTalkieService extends VoiceTranslationService {
     public static final int ON_FIRST_LANGUAGE = 22;
     public static final int ON_SECOND_LANGUAGE = 23;
     private RecognizerMultiListener speechRecognizerCallback;
+    private RecognizerAutoListener speechRecognizerAutoCallback;
     private RecognizerListener speechRecognizerSingleCallback;
 
     // objects
@@ -108,12 +111,14 @@ public class WalkieTalkieService extends VoiceTranslationService {
                                 break;
                             }
                             case CHANGE_FIRST_LANGUAGE:
+                                speechRecognizer.stop();
                                 CustomLocale newFirstLanguage = (CustomLocale) message.getData().getSerializable("language");
                                 if (!firstLanguage.equals(newFirstLanguage)) {
                                     firstLanguage = newFirstLanguage;
                                 }
                                 break;
                             case CHANGE_SECOND_LANGUAGE:
+                                speechRecognizer.stop();
                                 CustomLocale newSecondLanguage = (CustomLocale) message.getData().getSerializable("language");
                                 if (!secondLanguage.equals(newSecondLanguage)) {
                                     secondLanguage = newSecondLanguage;
@@ -132,6 +137,7 @@ public class WalkieTalkieService extends VoiceTranslationService {
                                 WalkieTalkieService.super.notifyToClient(bundle2);
                                 break;
                             case RECEIVE_TEXT:
+                                speechRecognizer.stop();
                                 String text = message.getData().getString("text", null);
                                 if (text != null) {
                                     //we stop speech recognition
@@ -156,12 +162,14 @@ public class WalkieTalkieService extends VoiceTranslationService {
                                 }
                                 break;
                             case START_MANUAL_RECOGNITION:
+                                speechRecognizer.stop();
                                 isMicAutomatic = false;
                                 if(mVoiceRecorder != null) {
                                     mVoiceRecorder.setManualMode(true);
                                 }
                                 break;
                             case STOP_MANUAL_RECOGNITION:
+                                speechRecognizer.stop();
                                 isMicAutomatic = true;
                                 if(manualRecognizingFirstLanguage || manualRecognizingSecondLanguage || manualRecognizingAutoLanguage){
                                     if(mVoiceRecorder != null) {
@@ -276,6 +284,25 @@ public class WalkieTalkieService extends VoiceTranslationService {
                 super.onVolumeLevel(volumeLevel);
                 // we notify the client
                 WalkieTalkieService.super.notifyVolumeLevel(volumeLevel);
+            }
+        };
+        speechRecognizerAutoCallback = new RecognizerAutoListener() {
+            @Override public void onSpeechRecognizedAutoResult(String text, String source) {
+                manualRecognizingAutoLanguage = false;
+                // Qwen supplies one transcript and its language. Never compare NaN
+                // or fabricated probabilities with Whisper's sequence scores.
+                if (QwenLanguages.code(firstLanguage.getCode()).equals(source)) {
+                    translate(text, firstLanguage, secondLanguage, TRANSLATOR_BEAM_SIZE, false, firstResultTranslateListener);
+                } else if (QwenLanguages.code(secondLanguage.getCode()).equals(source)) {
+                    translate(text, secondLanguage, firstLanguage, TRANSLATOR_BEAM_SIZE, false, secondResultTranslateListener);
+                } else {
+                    onError(new int[]{ErrorCodes.LANGUAGE_UNKNOWN}, 0);
+                }
+            }
+            @Override public void onError(int[] reasons, long value) {
+                manualRecognizingAutoLanguage = false;
+                startVoiceRecorder();
+                notifyMicActivated();
             }
         };
         speechRecognizerCallback = new RecognizerMultiListener() {
@@ -425,6 +452,7 @@ public class WalkieTalkieService extends VoiceTranslationService {
         if(finalFirstLanguage==null || finalSecondLanguage==null ) {  //se è il primo avvio
             //we attach the speech recognition callbacks
             speechRecognizer.addMultiCallback(speechRecognizerCallback);
+            speechRecognizer.addAutoCallback(speechRecognizerAutoCallback);
             speechRecognizer.addCallback(speechRecognizerSingleCallback);
         }
         return startType;
@@ -435,6 +463,7 @@ public class WalkieTalkieService extends VoiceTranslationService {
         Log.i("walkieTalkie", "WalkieTalkie service destroyed");
         //disconnect speechRecognizerCallback
         speechRecognizer.removeMultiCallback(speechRecognizerCallback);
+        speechRecognizer.removeAutoCallback(speechRecognizerAutoCallback);
         speechRecognizer.removeCallback(speechRecognizerSingleCallback);
         // Stop recognizer
         speechRecognizer.stop();
