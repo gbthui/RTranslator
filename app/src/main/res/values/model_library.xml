@@ -1,0 +1,34 @@
+<resources>
+    <string name="models_not_ready">Models are not ready</string>
+    <string name="manage_models">Manage models</string>
+    <string name="model_translation_missing">The selected translation model is missing or incomplete.</string>
+    <string name="model_voice_translation_missing">Mozilla language models selected for voice translation are missing.</string>
+    <string name="model_speech_missing">The selected speech recognition model is missing or incomplete.</string>
+    <string name="model_download_in_progress">A required model is still being downloaded.</string>
+    <string name="model_closing">Releasing active models. Settings remain available; native operations may take a moment to stop.</string>
+    <string name="model_load_failed">Could not load the selected models. Check the package in model management; no files will be downloaded automatically.</string>
+    <string name="model_loading">Loading the selected models…</string>
+    <string name="model_setup_message">%1$s\n\nOpen model management to import existing files or download a model.</string>
+    <string name="model_library_intro">Choose models here, then apply. Missing models can remain selected; only features with complete resources are available. Nothing is downloaded on launch.</string>
+    <string name="model_whisper_description">Whisper Small. Download these speech models separately from translation models and optional dictionaries.</string>
+    <string name="model_qwen_onnx_description">Qwen3-ASR 0.6B INT8. Import the sherpa-onnx folder including tokenizer, or download the verified package.</string>
+    <string name="model_qwen_gguf_description">Qwen3-ASR 0.6B Q4_K_M. One transcribe.cpp GGUF file, not a llama.cpp decoder/mmproj pair.</string>
+    <string name="model_import_translation">Import selected translation model from a folder</string>
+    <string name="model_import_speech">Import selected speech model from files</string>
+    <string name="model_import_optional">Import an optional resource</string>
+    <string name="model_ram_unknown">The upstream memory estimate applies to Whisper only. Qwen memory depends on the imported weights and device; no measured estimate is available.</string>
+    <string name="model_retry_acceleration">Retry hardware acceleration on next use</string>
+    <string name="model_retry_saved">Hardware failure history cleared for this model.</string>
+    <string name="model_validating">Importing and validating model files…</string>
+    <string name="model_downloading">Downloading model files…</string>
+    <string name="model_operation_complete">Model library updated. Apply your selection when ready.</string>
+    <string name="model_delete_qwen_confirmation">Delete all stored versions for this speech model? The selection is kept, but voice features will be unavailable until a model is installed.</string>
+    <string name="model_download_confirmation">Download this model from its public publisher? This may use about 1 GB of data and additional space for validation. Cancel pauses the transfer; retry resumes it when supported.</string>
+    <string name="model_download_action">Download</string>
+    <string name="model_cancel_leave">Cancel this model operation and leave this page? Native validation may finish before cancellation takes effect. Existing selected files are kept.</string>
+    <string name="model_download_busy">Finish or pause other model downloads before importing files.</string>
+    <string name="model_status_ready">Ready</string>
+    <string name="model_status_missing">Not installed</string>
+    <string name="model_optional_not_ready">Selected, but the optional files are not installed. Other translation features remain available.</string>
+    <string name="mic_processing_segment">Recording continues while earlier audio is processed.</string>
+</resources>

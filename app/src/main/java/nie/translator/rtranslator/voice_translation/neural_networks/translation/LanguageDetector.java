@@ -63,6 +63,7 @@ public class LanguageDetector {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                synchronized (LanguageDetector.this) {
                 try {
                     if (nativePtr == 0) {
                         Log.e(TAG, "Model not initialized.");
@@ -113,6 +114,7 @@ public class LanguageDetector {
                     Log.e(TAG, "Failed to predict language", e);
                     listener.onSuccess("und");
                 }
+                }
             }
         }).start();
     }
@@ -133,7 +135,7 @@ public class LanguageDetector {
         public abstract void onSuccess(String languageCode);
     }
 
-    public void close() {
+    public synchronized void close() {
         if (nativePtr != 0) {
             release(nativePtr);
             nativePtr = 0;

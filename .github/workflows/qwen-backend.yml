@@ -1,0 +1,106 @@
+name: Qwen backend validation
+on:
+  pull_request:
+    branches: [v3.00]
+    paths:
+      - 'app/**'
+      - 'docs/**'
+      - 'tools/**'
+      - '!tools/.ux-stage/**'
+      - '!tools/.qwen-stage/**'
+      - '.github/workflows/qwen-backend.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qwen-backend-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Cancellation, model-library and recording-window regressions
+        run: |
+          bash tools/test-qwen-core.sh
+          bash tools/test-model-library.sh
+      - name: Build-script syntax and patch hygiene
+        run: |
+          python3 -m py_compile tools/prepare-qwen-runtimes.py tools/patch-qwen-sherpa.py tools/download-qwen-test-models.py
+          git diff --check
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install SDK and native dependencies
+        run: |
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+          sudo apt-get update
+          sudo apt-get install -y ninja-build glslc libvulkan-dev spirv-headers
+      - uses: actions/cache/restore@v4
+        id: runtime-cache
+        with:
+          path: .gradle/qwen-runtimes
+          key: qwen-arm64-ndk28c-${{ hashFiles('tools/prepare-qwen-runtimes.py', 'tools/patch-qwen-sherpa.py', 'app/src/main/cpp/qwen/**') }}
+      - name: Build isolated ONNX, GGUF CPU and GGUF Vulkan libraries
+        run: python3 tools/prepare-qwen-runtimes.py --ndk "$ANDROID_HOME/ndk/28.2.13676358"
+      - uses: actions/cache/save@v4
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        with:
+          path: .gradle/qwen-runtimes
+          key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: qwen-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: qwen-gradle-${{ runner.os }}-
+      - name: Compile and package Android debug APK
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee android-build.log
+      - name: Verify APK contains all runtime libraries
+        run: |
+          python3 - <<'PY'
+          import glob, zipfile, hashlib, pathlib, subprocess
+          apk = glob.glob('app/build/outputs/apk/debug/*.apk')[0]
+          with zipfile.ZipFile(apk) as z:
+              for name in ('onnx', 'gguf_cpu', 'gguf_vulkan'):
+                  assert 'lib/arm64-v8a/librtranslator_qwen_' + name + '.so' in z.namelist(), name
+              assert 'lib/arm64-v8a/libonnxruntime.so' in z.namelist()
+              assert 'assets/qwen-runtime.properties' in z.namelist()
+          pathlib.Path(apk + '.sha256').write_text(hashlib.sha256(pathlib.Path(apk).read_bytes()).hexdigest() + '  ' + pathlib.Path(apk).name + '\n')
+          pathlib.Path('build-commit.txt').write_text(subprocess.check_output(['git','rev-parse','HEAD']).decode())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwen-android-build
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/debug/*.sha256
+            .gradle/qwen-runtimes/runtime.json
+            android-build.log
+            build-commit.txt
+          include-hidden-files: true
+          retention-days: 7

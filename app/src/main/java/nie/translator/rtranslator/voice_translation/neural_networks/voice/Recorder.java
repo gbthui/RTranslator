@@ -454,7 +454,7 @@ public class Recorder {
                         //we notify volume level
                         notifyVolumeLevel(mBuffer, oldTailIndex, tailIndex);
                         //we do the rest of voice processing
-                        final long now = System.currentTimeMillis();
+                        final long now = android.os.SystemClock.elapsedRealtime();
                         if (isHearingVoice(mBufferShort, oldTailIndex, tailIndex)) {
                             if (mLastVoiceHeardMillis == Long.MAX_VALUE) {    // use Long's maximum limit to indicate that we have no voice
                                 mVoiceStartedMillis = now;
@@ -471,13 +471,17 @@ public class Recorder {
                                 }
                             }
                             mLastVoiceHeardMillis = now;
-                            if (now - (mVoiceStartedMillis - global.getPrevVoiceDuration()) > MAX_SPEECH_LENGTH_MILLIS) {  //if we are listening voice for more than MAX_SPEECH_LENGTH_MILLIS
-                                executeEnd();
-                            }
                         } else if (mLastVoiceHeardMillis != Long.MAX_VALUE) {
-                            if (now - mLastVoiceHeardMillis > global.getSpeechTimeout()) {  //if we had not heard voice for global.getSpeechTimeout() ms
+                            if (CaptureWindow.shouldEnd(true, false, isManualMode,
+                                    now - mLastVoiceHeardMillis, global.getSpeechTimeout())) {
                                 executeEnd();
                             }
+                        }
+                        // Flush a bounded model window, including short pauses, without
+                        // announcing an end of speech or reapplying pre-roll to the next window.
+                        if (mLastVoiceHeardMillis != Long.MAX_VALUE && CaptureWindow.shouldRoll(
+                                getMBufferRangeSize(startVoiceIndex, tailIndex), sampleRate, MAX_SPEECH_LENGTH_MILLIS)) {
+                            emitVoice(false);
                         }
                     }
                 }
@@ -524,7 +528,9 @@ public class Recorder {
      * Closes the current utterance and hands it to the callback. Audio thread only —
      * public callers reach this through {@link #end()}.
      */
-    private void executeEnd() {
+    private void executeEnd() { emitVoice(true); }
+
+    private void emitVoice(boolean endOfSpeech) {
         if (mLastVoiceHeardMillis == Long.MAX_VALUE) {
             return; // no utterance in progress; emitting here would ship stale buffer contents
         }
@@ -536,12 +542,13 @@ public class Recorder {
             circularIndex = (circularIndex + 1 == mBuffer.length) ? 0 : circularIndex + 1;
         }
 
-        mLastVoiceHeardMillis = Long.MAX_VALUE;
-        startVoiceIndex = 0;
-
-        mCallback.onVoice(data, voiceLength);
-        isRecording = false;
-        mCallback.onVoiceEnd();
+        startVoiceIndex = tailIndex;
+        if (voiceLength > 0) mCallback.onVoice(data, voiceLength);
+        if (endOfSpeech) {
+            mLastVoiceHeardMillis = Long.MAX_VALUE;
+            isRecording = false;
+            mCallback.onVoiceEnd();
+        }
     }
 
     /** Audio thread only — public callers reach this through {@link #dismiss()}. */

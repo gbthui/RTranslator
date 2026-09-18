@@ -92,6 +92,10 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:theme="@style/Theme.Speech" />
+        <activity android:name="nie.translator.rtranslator.settings.QwenSettingsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenLayout|screenSize"
+            android:theme="@style/Theme.Settings" />
         <activity android:name="nie.translator.rtranslator.GeneralActivity" />
         <activity android:name="nie.translator.rtranslator.tools.ImageActivity"
             android:exported="true"

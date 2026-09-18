@@ -171,7 +171,7 @@ public class MozillaManagerFragment  extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        boolean serviceStarted = downloadManager.subscribeAndResumeDownload(downloadManagerCallback);
+        boolean serviceStarted = downloadManager.subscribe(downloadManagerCallback);
         if(!serviceStarted){
             ArrayList<DownloadGroupInfo> downloadStatus = downloadManager.getSavedDownloadStatus();
             // we change the GUI based on current saved download status

@@ -14,11 +14,16 @@ public class DictionaryTranslator {
         System.loadLibrary("dictionary_translator_interface");
     }
 
+    private static volatile boolean initialized;
+
     public static void initializeService(String dbPath){
+        if (!new java.io.File(dbPath).isFile()) return;
         initializeServiceNative(dbPath);
+        initialized = true;
     }
 
     public static void loadDictionary(CustomLocale lang){
+        if (!initialized) return;
         String langCode = convertToMacroLanguage(lang).getISO3Language();
         if(!Objects.equals(langCode, "eng")) {
             loadDictionaryNative(langCode);
@@ -26,11 +31,13 @@ public class DictionaryTranslator {
     }
 
     public static void unloadDictionary(CustomLocale lang){
+        if (!initialized) return;
         unloadDictionaryNative(convertToMacroLanguage(lang).getISO3Language());
     }
 
     @Nullable
     public static String[] translateWord(String word, CustomLocale srcLang, CustomLocale tgtLang){
+        if (!initialized) return null;
         long time = System.currentTimeMillis();
         String normalizedWord = TextTools.normalizeText(word);
         srcLang = convertToMacroLanguage(srcLang);
@@ -46,6 +53,7 @@ public class DictionaryTranslator {
     }
 
     public static boolean containsWord(String word, CustomLocale lang){
+        if (!initialized) return false;
         long time = System.currentTimeMillis();
         lang = convertToMacroLanguage(lang);
         boolean result = containsWordNative(word, lang.getISO3Language());
@@ -99,7 +107,8 @@ public class DictionaryTranslator {
 
 
     public static void cleanup(){
-        cleanupNative();
+        if (initialized) cleanupNative();
+        initialized = false;
     }
 
     private static native void initializeServiceNative(String dbPath);

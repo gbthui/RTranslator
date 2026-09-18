@@ -72,6 +72,7 @@ public class ConversationService extends VoiceTranslationService {
         super.onCreate();
         isRunning = true;
         global = (Global) getApplication();
+        if (!global.models().ready(true)) { isRunning = false; stopSelf(); return; }
         mainHandler = new Handler(Looper.getMainLooper());
         SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
         isAudioMute = !sharedPreferences.getBoolean("conversationAutoTTS", true);
@@ -304,15 +305,17 @@ public class ConversationService extends VoiceTranslationService {
     public void onDestroy() {
         // Stop SpeechRecognizer
         //mVoiceRecognizer.destroy();
-        mVoiceRecognizer.removeCallback(mVoiceRecognizerCallback);
-        mVoiceRecognizer.stop();
+        if (mVoiceRecognizer != null) {
+            mVoiceRecognizer.removeCallback(mVoiceRecognizerCallback);
+            mVoiceRecognizer.stop();
+        }
         mVoiceRecognizer = null;
         //stop Bluetooth helper
         //mBluetoothHelper.stop();
         if(global.getBluetoothCommunicator() != null) {
             global.getBluetoothCommunicator().removeCallback(communicationCallback);
         }
-        translator.unloadAllLangResourcesForConversation(null);
+        if (translator != null) translator.unloadAllLangResourcesForConversation(null);
         isRunning = false;
         super.onDestroy();
     }

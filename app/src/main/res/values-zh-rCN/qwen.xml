@@ -1,0 +1,21 @@
+<resources>
+    <string name="qwen_settings_title">语音识别后端</string>
+    <string name="qwen_settings_summary">Whisper 或本地 Qwen3-ASR（ONNX / GGUF）</string>
+    <string name="qwen_details">请先导入 Qwen3-ASR-0.6B 模型。ONNX 请选择包含 tokenizer 的 sherpa-onnx INT8 文件夹；GGUF 请选择 transcribe.cpp 的单文件 qwen3_asr 模型，不支持 llama.cpp 的 decoder/mmproj 双文件组合。导入先复制到私有存储并以 CPU 验证，成功后启用。导入或切换会关闭当前语音模式。Qwen 支持 30 种语言，不支持乌尔都语；其他语言请切回 Whisper。旧模型版本保留至手动删除该后端的模型。</string>
+    <string name="qwen_whisper">Whisper Small（原有后端）</string>
+    <string name="qwen_onnx">Qwen3-ASR · sherpa-onnx</string>
+    <string name="qwen_gguf">Qwen3-ASR · GGUF / transcribe.cpp</string>
+    <string name="qwen_hardware">尝试硬件加速（ONNX：NNAPI；GGUF：Vulkan）。此选项不会自动判断谁更快。</string>
+    <string name="qwen_import_onnx">导入并启用 ONNX 模型文件夹</string>
+    <string name="qwen_import_gguf">导入并启用 GGUF 模型文件</string>
+    <string name="qwen_apply">应用选择 / 重试硬件加速</string>
+    <string name="qwen_delete">删除所选 Qwen 后端的全部模型</string>
+    <string name="qwen_delete_confirm">删除该后端的全部已导入版本并切回 Whisper？</string>
+    <string name="qwen_return">返回翻译器</string>
+    <string name="qwen_cancel">取消操作</string>
+    <string name="qwen_installed">已安装：%1$s · %2$s</string>
+    <string name="qwen_working">正在停止识别，随后验证或导入模型…</string>
+    <string name="qwen_cancelled">已取消。原模型选择保持不变。</string>
+    <string name="qwen_failed">操作未完成。</string>
+    <string name="qwen_missing_model">请先为该后端导入兼容模型。</string>
+</resources>

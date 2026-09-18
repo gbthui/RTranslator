@@ -117,6 +117,22 @@ public class Global extends Application implements DefaultLifecycleObserver {
     private int translationMode;
     private VadSilero vad;
     private boolean modelsLoaded = false;
+    private final nie.translator.rtranslator.models.ModelRuntime modelRuntime = new nie.translator.rtranslator.models.ModelRuntime(this);
+    public nie.translator.rtranslator.models.ModelRuntime models() { return modelRuntime; }
+    public void closeTranslator(Runnable done) {
+        Translator old = translator; translator = null;
+        if (old == null) done.run(); else old.closeAsync(done);
+    }
+    /** Persist incomplete configurations without trying to load missing models. */
+    public void saveModelPreferences(int mode, boolean mozillaVoice, boolean tatoeba, boolean dictionaries, boolean reducedRam) {
+        translationMode = mode; useMozillaForVoiceTranslation = mozillaVoice;
+        useTatoeba = tatoeba; useTranslationDictionaries = dictionaries; whisperReducedRam = reducedRam;
+        getSharedPreferences("default", MODE_PRIVATE).edit().putInt("selectedTranslationModel", mode)
+            .putBoolean("useMozillaForVoiceTranslation", mozillaVoice).putBoolean("useTatoeba", tatoeba)
+            .putBoolean("useTranslationDictionaries", dictionaries).putBoolean("whisperReducedRam", reducedRam).apply();
+        updateLanguages();
+    }
+
 
     @Override
     public void onCreate() {
@@ -157,7 +173,10 @@ public class Global extends Application implements DefaultLifecycleObserver {
 
     public void initializeTranslator(Translator.GeneralListener initListener){
         if(translator == null) {
-            translator = new Translator(this, getTranslationMode(), isUseMozillaForVoiceTranslation(), isUseTatoeba(), isUseTranslationDictionaries(), initListener);
+            translator = new Translator(this, getTranslationMode(),
+                isUseMozillaForVoiceTranslation() && nie.translator.rtranslator.models.FeatureReadiness.mozilla(this),
+                isUseTatoeba() && nie.translator.rtranslator.models.FeatureReadiness.tatoeba(this),
+                isUseTranslationDictionaries() && nie.translator.rtranslator.models.FeatureReadiness.dictionaries(this), initListener);
         }else{
             initListener.onSuccess();
         }
@@ -173,7 +192,7 @@ public class Global extends Application implements DefaultLifecycleObserver {
                     .setSilenceDurationMs(300)
                     .setSpeechDurationMs(50)
                     .build();
-            speechRecognizer = new Recognizer(this, true, initListener);
+            speechRecognizer = Recognizer.create(this, initListener);
         }else{
             initListener.onInitializationFinished();
         }
@@ -231,6 +250,7 @@ public class Global extends Application implements DefaultLifecycleObserver {
 
     public ArrayList<CustomLocale> getLanguages(RTranslatorMode rtranslatorMode, final boolean recycleResult) {
         ArrayList<CustomLocale> translatorLanguages = getTranslatorLanguages(rtranslatorMode, recycleResult);
+        if (rtranslatorMode == RTranslatorMode.TEXT_TRANSLATION_MODE) return translatorLanguages;
         ArrayList<CustomLocale> speechRecognizerLanguages = Recognizer.getSupportedLanguages(Global.this);
         //we return only the languages compatible with the speech recognizer and the translator (without loading TTS languages)
         final ArrayList<CustomLocale> compatibleLanguages = new ArrayList<>();
@@ -281,23 +301,15 @@ public class Global extends Application implements DefaultLifecycleObserver {
      * @param recycleResult decides if recycle the result or not
      * @return the list of installed Mozilla languages
      */
-    private ArrayList<CustomLocale> getMozillaLanguages(final boolean recycleResult){
-        if (recycleResult && !mozillaInstalledLanguages.isEmpty()) {
-            return mozillaInstalledLanguages;
-        } else {
-            ArrayList<DownloadGroupInfo> downloads = DownloadManager.getSavedDownloadStatus(this);
-            ArrayList<MozillaLanguageDownloadInfo> mozillaLanguageDownloadInfos = getMozillaLanguagesDownloadInfo(recycleResult);
-            ArrayList<CustomLocale> mozillaInstalledLanguages = new ArrayList<>();
-            for (Global.MozillaLanguageDownloadInfo langDownloadInfo : mozillaLanguageDownloadInfos) {
-                int index = downloads.indexOf(langDownloadInfo.downloadGroupInfo);
-                if (index != -1 && downloads.get(index).isAllDownloadCompleted()) {
-                    mozillaInstalledLanguages.add(langDownloadInfo.lang);
-                }
-            }
-            mozillaInstalledLanguages.add(new CustomLocale("en"));  //English is always present, but it isn't present in the getMozillaLanguagesDownloadInfo list, so we add it manually
-            this.mozillaInstalledLanguages = mozillaInstalledLanguages;
-            return mozillaInstalledLanguages;
+    private ArrayList<CustomLocale> getMozillaLanguages(final boolean recycleResult) {
+        ArrayList<CustomLocale> result = new ArrayList<>();
+        java.io.File root = new java.io.File(nie.translator.rtranslator.models.FeatureReadiness.translation(this), "Mozilla");
+        for (MozillaLanguageDownloadInfo info : getMozillaLanguagesDownloadInfo(true)) {
+            if (nie.translator.rtranslator.models.ModelFiles.mozillaLanguage(root, info.lang.getLanguage())) result.add(info.lang);
         }
+        if (!result.isEmpty()) result.add(new CustomLocale("en"));
+        mozillaInstalledLanguages = result;
+        return result;
     }
 
     /**
@@ -547,6 +559,14 @@ public class Global extends Application implements DefaultLifecycleObserver {
     }
 
 
+    public DownloadGroupInfo getWhisperDownloadInfo() {
+        DownloadInfo[] old = getInitialDownloadInfo().downloadsInfo;
+        return new DownloadGroupInfo(java.util.Arrays.copyOf(old, 6));
+    }
+    public DownloadGroupInfo getDictionariesDownloadInfo() {
+        return new DownloadGroupInfo(new DownloadInfo[]{getInitialDownloadInfo().downloadsInfo[6]});
+    }
+
     @Nullable
     public Translator getTranslator() {
         return translator;
@@ -562,7 +582,17 @@ public class Global extends Application implements DefaultLifecycleObserver {
     }
 
     public void deleteSpeechRecognizer(){
+        Recognizer old = speechRecognizer;
         speechRecognizer = null;
+        if (old != null) old.destroy();
+    }
+
+    /** Complete native teardown before settings replace a model on disk. */
+    public void closeSpeechRecognizer(Runnable afterClose) {
+        Recognizer old = speechRecognizer;
+        speechRecognizer = null;
+        if (old == null) afterClose.run();
+        else old.closeAsync(afterClose);
     }
 
     public boolean isForeground() {
